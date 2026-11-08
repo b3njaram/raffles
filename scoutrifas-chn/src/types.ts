@@ -23,6 +23,7 @@ export interface Draft {
 export const defaultDraft: Draft = { title:'',description:'',type:'raffle',category:'Aventura',end_at:'',min_bid:100,bid_step:20,max_entries:100,max_per_user:1 };
 export const formatId = (value: string) => value.trim().toUpperCase().replace(/\s/g,'');
 export const isScoutId = (value: string) => /^CHN-?[A-Z0-9]{4,12}$/.test(formatId(value));
+export const canViewCatalogue = (profile: Profile|null|undefined): boolean => Boolean(profile?.verified && isScoutId(profile.scout_id));
 export const minimumBid = (l: Listing) => l.bid_count ? l.current_bid+l.bid_step : l.min_bid;
 export const money = (n: number) => new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',maximumFractionDigits:0}).format(n);
 export const remaining = (iso: string) => {

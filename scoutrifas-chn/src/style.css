@@ -15,3 +15,8 @@ main{min-height:65vh}.hero-shell{max-width:1230px;padding:0 20px;margin:22px aut
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 
 .public-listings{margin:33px 35px 0}.public-listings h3{font-size:20px}.public-listings .cards-grid{grid-template-columns:repeat(2,minmax(0,1fr))}@media(max-width:540px){.public-listings{margin:24px 20px 0}.public-listings .cards-grid{grid-template-columns:1fr}}
+
+/* La portada pública nunca renderiza tarjetas ni estadísticas del catálogo. */
+.private-welcome{min-height:215px;display:grid;place-items:center;padding-bottom:60px}
+.private-welcome-inner{max-width:560px;text-align:center;display:flex;align-items:center;flex-direction:column;gap:13px;background:#fff;border:1px solid var(--border);box-shadow:0 8px 28px #3015350b;border-radius:18px;padding:30px 28px}
+.private-welcome-inner svg{color:var(--purple)}.private-welcome-inner h2{margin:0;font-size:25px}.private-welcome-inner p{margin:0 0 4px;color:#766a7c;font-size:13px}

@@ -87,7 +87,7 @@ language sql stable security definer set search_path = '' as $$
 $$;
 create or replace function private.is_verified() returns boolean
 language sql stable security definer set search_path = '' as $$
-  select coalesce((select p.verified from public.profiles p where p.id = (select auth.uid())),false)
+  select coalesce((select p.verified and p.scout_id ~ '^CHN-?[A-Z0-9]{4,12}$' from public.profiles p where p.id = (select auth.uid())),false)
 $$;
 revoke all on function private.is_admin() from public, anon;
 revoke all on function private.is_verified() from public, anon;
@@ -113,7 +113,7 @@ alter table public.bids enable row level security;
 alter table public.draw_audit enable row level security;
 
 revoke all on public.profiles,public.listings,public.raffle_entries,public.bids,public.draw_audit from anon,authenticated;
-grant select on public.profiles,public.listings to anon,authenticated;
+grant select on public.profiles,public.listings to authenticated;
 grant select on public.raffle_entries,public.bids,public.draw_audit to authenticated;
 grant update (display_name,group_name,bio,avatar_path) on public.profiles to authenticated;
 grant insert (owner_id,title,description,type,category,image_paths,end_at,min_bid,bid_step,max_entries,max_per_user)
@@ -121,21 +121,25 @@ grant insert (owner_id,title,description,type,category,image_paths,end_at,min_bi
 grant update (title,description,category,image_paths,end_at,min_bid,bid_step,max_entries,max_per_user)
   on public.listings to authenticated;
 
-create policy "profiles visible" on public.profiles for select to anon,authenticated using (true);
+create policy "member profiles only" on public.profiles for select to authenticated
+using (id = (select auth.uid()) or (select private.is_admin())
+  or ((select private.is_verified()) and verified));
 create policy "edit own profile" on public.profiles for update to authenticated
 using (id = (select auth.uid())) with check (id = (select auth.uid()));
-create policy "view public or owned or moderated listings" on public.listings for select to anon,authenticated
-using (status in ('active','finished') or (select auth.uid()) = owner_id or (select private.is_admin()));
+create policy "member only listings" on public.listings for select to authenticated
+using (((select private.is_verified()) or (select private.is_admin())) and
+  (status in ('active','finished') or (select auth.uid()) = owner_id or (select private.is_admin())));
 create policy "verified member submits for review" on public.listings for insert to authenticated
 with check (owner_id = (select auth.uid()) and status = 'pending' and (select private.is_verified()) and end_at > now());
 create policy "owner edits pending only" on public.listings for update to authenticated
 using (owner_id = (select auth.uid()) and status = 'pending')
 with check (owner_id = (select auth.uid()) and status = 'pending' and end_at > now());
 create policy "own entries or managed" on public.raffle_entries for select to authenticated
-using (user_id = (select auth.uid()) or (select private.is_admin()) or exists (select 1 from public.listings l where l.id=listing_id and l.owner_id=(select auth.uid())));
+using (((select private.is_verified()) or (select private.is_admin())) and (user_id = (select auth.uid()) or (select private.is_admin()) or exists (select 1 from public.listings l where l.id=listing_id and l.owner_id=(select auth.uid()))));
 create policy "own bids or managed" on public.bids for select to authenticated
-using (user_id = (select auth.uid()) or (select private.is_admin()) or exists (select 1 from public.listings l where l.id=listing_id and l.owner_id=(select auth.uid())));
-create policy "audit public to members" on public.draw_audit for select to authenticated using (true);
+using (((select private.is_verified()) or (select private.is_admin())) and (user_id = (select auth.uid()) or (select private.is_admin()) or exists (select 1 from public.listings l where l.id=listing_id and l.owner_id=(select auth.uid()))));
+create policy "audit only members" on public.draw_audit for select to authenticated
+using ((select private.is_verified()) or (select private.is_admin()));
 
 -- Las únicas rutas de creación de participaciones/pujas usan locks y validación en BD.
 -- Wrappers públicos SECURITY INVOKER; el código privilegiado permanece en private.
@@ -241,16 +245,33 @@ grant execute on function private.place_bid_impl(uuid,integer),private.join_raff
 revoke all on function public.place_bid(uuid,integer),public.join_raffle(uuid),public.review_user(uuid,boolean),public.review_listing(uuid,text),public.finish_listing(uuid) from public,anon;
 grant execute on function public.place_bid(uuid,integer),public.join_raffle(uuid),public.review_user(uuid,boolean),public.review_listing(uuid,text),public.finish_listing(uuid) to authenticated;
 
--- Fotos públicas: solo se permiten imágenes; escrituras limitadas a la carpeta del uid.
+-- Avatares públicos, pero las fotos de rifas/subastas permanecen en un bucket PRIVADO.
 insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
 values('scout-photos','scout-photos',true,5242880,array['image/jpeg','image/png','image/webp'])
-on conflict(id) do update set file_size_limit=excluded.file_size_limit,allowed_mime_types=excluded.allowed_mime_types;
-create policy "upload own CHN photos" on storage.objects for insert to authenticated
+on conflict(id) do update set public=true,file_size_limit=excluded.file_size_limit,allowed_mime_types=excluded.allowed_mime_types;
+insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
+values('scout-listings','scout-listings',false,5242880,array['image/jpeg','image/png','image/webp'])
+on conflict(id) do update set public=false,file_size_limit=excluded.file_size_limit,allowed_mime_types=excluded.allowed_mime_types;
+
+create policy "upload own avatar" on storage.objects for insert to authenticated
 with check (bucket_id='scout-photos' and (storage.foldername(name))[1] = (select auth.uid())::text
-  and (storage.foldername(name))[2] in ('avatars','listings')
+  and (storage.foldername(name))[2] = 'avatars'
   and lower(storage.extension(name)) in ('jpg','jpeg','png','webp'));
-create policy "delete own CHN photos" on storage.objects for delete to authenticated
+create policy "delete own avatar" on storage.objects for delete to authenticated
 using (bucket_id='scout-photos' and (storage.foldername(name))[1] = (select auth.uid())::text);
+
+create policy "upload own private listing photos" on storage.objects for insert to authenticated
+with check (bucket_id='scout-listings' and (select private.is_verified())
+  and (storage.foldername(name))[1] = (select auth.uid())::text
+  and (storage.foldername(name))[2] = 'listings'
+  and lower(storage.extension(name)) in ('jpg','jpeg','png','webp'));
+create policy "only verified members access listing photos" on storage.objects for select to authenticated
+using (bucket_id='scout-listings'
+  and ((select private.is_verified()) or (select private.is_admin()))
+  and exists (select 1 from public.listings l where name = any(l.image_paths)
+    and (l.status in ('active','finished') or l.owner_id = (select auth.uid()) or (select private.is_admin()))));
+create policy "owner can delete listing photos" on storage.objects for delete to authenticated
+using (bucket_id='scout-listings' and (storage.foldername(name))[1] = (select auth.uid())::text);
 
 -- Para designar al PRIMER admin, desde SQL Editor con acceso de propietario:
 -- update public.profiles set role='admin',verified=true where scout_id='CHN-0001';
