@@ -80,7 +80,7 @@ export const backend={
   },
   async logout(){if(!supabase){state().user=null;save();return;} const r=await supabase.auth.signOut();if(r.error)throw r.error;},
   async updateProfile(id:string, updates:Partial<Pick<Profile,'display_name'|'group_name'|'bio'|'avatar_path'>>){
-    if(!supabase){if(state().user?.id!==id)throw new Error('Sesión inválida');state().user={...state().user,...updates};save();return;}
+    if(!supabase){const s=state();if(!s.user||s.user.id!==id)throw new Error('Sesión inválida');s.user={...s.user,...updates};save();return;}
     const r=await supabase.from('profiles').update(updates).eq('id',id);if(r.error)throw r.error;
   },
   async upload(file:File,userId:string,folder:'avatars'|'listings'){
