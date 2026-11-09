@@ -67,10 +67,12 @@ function Authentication({mode,setMode,onClose,onSuccess,notify}:{mode:AuthMode;s
 
 function Detail({item,user,onClose,onLogin,refresh,notify,onProfile}:{item:Listing;user:Profile|null;onClose:()=>void;onLogin:()=>void;refresh:()=>Promise<void>;notify:(s:string,error?:boolean)=>void;onProfile:(u:Profile)=>void}){
  const [amount,setAmount]=useState(String(minimumBid(item))),[photo,setPhoto]=useState(0),[busy,setBusy]=useState(false);
+ const [history,setHistory]=useState<Activity[]>([]),[bidNames,setBidNames]=useState<Record<string,string>>({});
  const alive=isLive(item);const [winner,setWinner]=useState<Profile|null>(null);
  useEffect(()=>{setAmount(String(minimumBid(item)))},[item.id,item.current_bid,item.bid_count]);
  useEffect(()=>{setPhoto(0)},[item.id]);
  useEffect(()=>{if(item.winner_id)backend.members().then(x=>setWinner(x.find(u=>u.id===item.winner_id)||null)).catch(()=>{});},[item.winner_id]);
+ useEffect(()=>{if(item.type!=='auction')return;let active=true;void Promise.all([backend.bidHistory(item.id),backend.members()]).then(([records,users])=>{if(active){setHistory(records);setBidNames(Object.fromEntries(users.map(u=>[u.id,u.display_name])))}}).catch(()=>{});return()=>{active=false}},[item.id,item.bid_count,item.type]);
  const act=async()=>{
   if(!user){onLogin();return;}if(!user.verified){notify('Un administrador debe validar tu ID CHN antes de participar.',true);return;}
   setBusy(true);try{
@@ -87,6 +89,8 @@ function Detail({item,user,onClose,onLogin,refresh,notify,onProfile}:{item:Listi
   {winner&&<div className="winner"><Sparkles size={18}/> Resultado publicado: <b>{winner.display_name}</b></div>}
   {item.type==='auction'?<div className="bidding"><small>Puja actual</small><div className="current-bid">{money(item.bid_count?item.current_bid:item.min_bid)} <span>MXN · Sin cobro en línea</span></div>
      {alive&&<label>Tu propuesta (mínimo {money(minimumBid(item))})<input type="number" min={minimumBid(item)} max={10000000} step={1} value={amount} onChange={e=>setAmount(e.target.value)}/></label>}
+      {alive&&<div className="bid-quick"><button type="button" onClick={()=>setAmount(String(minimumBid(item)))}>Puja mínima</button><button type="button" onClick={()=>setAmount(String(Math.min(10000000,Math.max(minimumBid(item),Number(amount)||0)+item.bid_step)))}>+ {money(item.bid_step)}</button></div>}
+      {!!history.length&&<div className="bid-history"><b>Historial reciente</b>{history.slice(0,10).map(b=><div key={b.id}><strong>{money(b.amount||0)}</strong><small>{bidNames[b.user_id]||'Mi propuesta'} · {new Date(b.created_at||'').toLocaleString('es-MX')}</small></div>)}</div>}
    </div>:<div className="raffle-note"><Ticket size={21}/><div><strong>Participación gratuita</strong><p>Máximo {item.max_per_user} {item.max_per_user===1?'participación':'participaciones'} por cuenta verificada. El sorteo se realizará al finalizar.</p></div></div>}
   <button className="primary full" disabled={busy||!alive||user?.id===item.owner_id||!!(user&&!user.verified)} onClick={act}>
    {busy?'Guardando…':!alive?'No disponible':user?.id===item.owner_id?'Es tu publicación':user&&!user.verified?'Pendiente de verificación':item.type==='raffle'?'Quiero participar gratis':'Registrar mi puja'} <ArrowRight size={18}/>
@@ -156,12 +160,13 @@ function Admin({items,refresh,notify}:{items:Listing[];refresh:()=>Promise<void>
  const review=async(id:string,action:'active'|'paused'|'cancelled')=>{setBusy(id);try{await backend.reviewListing(id,action);await Promise.all([reload(),refresh()]);notify('Publicación actualizada.')}catch(err){notify(err instanceof Error?err.message:'Error',true)}finally{setBusy('')}};
  const finish=async(id:string)=>{if(!window.confirm('¿Confirmas el cierre y resultado final?'))return;setBusy(id);try{await backend.finish(id);await Promise.all([reload(),refresh()]);notify('Resultado registrado.')}catch(err){notify(err instanceof Error?err.message:'Error',true)}finally{setBusy('')}};
  const verify=async(id:string,value:boolean)=>{setBusy(id);try{await backend.reviewUser(id,value);await reload();notify('Estado de miembro actualizado.')}catch(err){notify(err instanceof Error?err.message:'Error',true)}finally{setBusy('')}};
- const csv=()=>{
+ const csv=async()=>{try{const allBids=await backend.allAdminBids();
   const cell=(x:unknown)=>'"'+String(x??'').replace(/"/g,'""').replace(/^[=+\-@]/,"'$&")+'"';
-  const rows=[['Fecha','Publicación','Nombre','ID scout','Puja MXN'],...report.bids.map(b=>[b.created_at||'',listings.get(b.listing_id)?.title||'',people.get(b.user_id)?.display_name||'',people.get(b.user_id)?.scout_id||'',b.amount||0])];
+  const rows=[['Fecha','Publicación','Nombre','ID scout','Puja MXN'],...allBids.map(b=>[b.created_at||'',listings.get(b.listing_id)?.title||'',people.get(b.user_id)?.display_name||'',people.get(b.user_id)?.scout_id||'',b.amount||0])];
   const data=String.fromCharCode(65279)+rows.map(row=>row.map(cell).join(',')).join('\r\n');
   const url=URL.createObjectURL(new Blob([data],{type:'text/csv;charset=utf-8'}));
   const link=document.createElement('a');link.href=url;link.download='pujas-scout-chn.csv';link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+ }catch(err){notify(err instanceof Error?err.message:'No se pudo exportar.',true)}
  };
  return <section className="admin-view">
  <div className="section-title"><div><span className="kicker">CENTRO DE CONTROL</span><h2>Panel de administración</h2><p>Pujas, registros, progreso y revisiones en un solo lugar.</p></div><ShieldCheck size={38} className="admin-shield"/></div>
