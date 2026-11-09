@@ -68,7 +68,8 @@ function Authentication({mode,setMode,onClose,onSuccess,notify}:{mode:AuthMode;s
 function Detail({item,user,onClose,onLogin,refresh,notify,onProfile}:{item:Listing;user:Profile|null;onClose:()=>void;onLogin:()=>void;refresh:()=>Promise<void>;notify:(s:string,error?:boolean)=>void;onProfile:(u:Profile)=>void}){
  const [amount,setAmount]=useState(String(minimumBid(item))),[photo,setPhoto]=useState(0),[busy,setBusy]=useState(false);
  const alive=isLive(item);const [winner,setWinner]=useState<Profile|null>(null);
- useEffect(()=>{setAmount(String(minimumBid(item)));setPhoto(0)},[item.id,item.current_bid,item.bid_count]);
+ useEffect(()=>{setAmount(String(minimumBid(item)))},[item.id,item.current_bid,item.bid_count]);
+ useEffect(()=>{setPhoto(0)},[item.id]);
  useEffect(()=>{if(item.winner_id)backend.members().then(x=>setWinner(x.find(u=>u.id===item.winner_id)||null)).catch(()=>{});},[item.winner_id]);
  const act=async()=>{
   if(!user){onLogin();return;}if(!user.verified){notify('Un administrador debe validar tu ID CHN antes de participar.',true);return;}
@@ -78,7 +79,7 @@ function Detail({item,user,onClose,onLogin,refresh,notify,onProfile}:{item:Listi
    await refresh();onClose();
   }catch(e){notify(e instanceof Error?e.message:'No se pudo registrar.',true)}finally{setBusy(false)}
  };
- return <div className="detail-layout"><div className="detail-image"><img src={imageUrl(item.image_paths[photo])||sampleHero} alt={item.title}/><TypeMark type={item.type}/></div>
+ return <div className="detail-layout"><div className="detail-image"><img src={imageUrl(item.image_paths[photo])||sampleHero} alt={item.title}/><TypeMark type={item.type}/>{item.image_paths.length>1&&<div className="detail-thumbnails">{item.image_paths.map((p,i)=><button key={p} type="button" className={photo===i?'chosen':''} onClick={()=>setPhoto(i)} aria-label={'Ver foto '+String(i+1)}><img src={imageUrl(p)||sampleHero} alt=""/></button>)}</div>}</div>
  <div className="detail-main"><div className="eyebrow">{iconCategories[item.category]} {item.category} <span className="sep">•</span> <Status status={item.status}/></div>
   <h2>{item.title}</h2><div className="detail-host">Publicado por <button onClick={()=>{if(item.owner)onProfile(item.owner)}}><Avatar user={item.owner} size={28}/>{item.owner?.display_name||'Miembro CHN'} {item.owner?.verified&&<ShieldCheck size={15}/>}</button></div>
   <p className="detail-desc">{item.description}</p>
@@ -219,14 +220,14 @@ function ExistingMemberJoin({done,cancel,notify}:{done:()=>Promise<void>;cancel:
 }
 
 export default function App(){
- const [viewer,setViewer]=useState<Profile|null>(null),[items,setItems]=useState<Listing[]>([]),[loading,setLoading]=useState(true),[screen,setScreen]=useState<Screen>('explore'),[profileTarget,setProfileTarget]=useState<Profile|null>(null),[selected,setSelected]=useState<Listing|null>(null);
+ const [needsEnrollment,setNeedsEnrollment]=useState(false);const [viewer,setViewer]=useState<Profile|null>(null),[items,setItems]=useState<Listing[]>([]),[loading,setLoading]=useState(true),[screen,setScreen]=useState<Screen>('explore'),[profileTarget,setProfileTarget]=useState<Profile|null>(null),[selected,setSelected]=useState<Listing|null>(null);
  const [auth,setAuth]=useState<AuthMode|null>(null),[creating,setCreating]=useState(false),[menu,setMenu]=useState(false),[query,setQuery]=useState(''),[kind,setKind]=useState<'all'|'raffle'|'auction'>('all'),[category,setCategory]=useState('Todas'),[sort,setSort]=useState('recent');
  const [activities,setActivities]=useState<{entries:Activity[];bids:Activity[]}>({entries:[],bids:[]}),[toast,setToast]=useState<{text:string;error:boolean}|null>(null);
  const notify=useCallback((text:string,error=false)=>setToast({text,error}),[]);
  useEffect(()=>{if(!toast)return;const t=setTimeout(()=>setToast(null),5000);return()=>clearTimeout(t)},[toast]);
  const refresh=useCallback(async()=>{const data=await backend.list();setItems(data);setSelected(current=>current?data.find(i=>i.id===current.id)||null:null);},[]);
  const refreshUser=useCallback(async()=>{
-  const person=await backend.session();setViewer(person);
+  const person=await backend.session();setViewer(person);setNeedsEnrollment(!person&&cloud?await backend.isSignedIn():false);
   if(canViewCatalogue(person)){const listings=await backend.list();setItems(listings)}
   else{setItems([]);setSelected(null);setActivities({entries:[],bids:[]});setScreen('explore')}
  },[]);
@@ -236,6 +237,7 @@ export default function App(){
   return()=>{alive=false;sub?.data.subscription.unsubscribe()};
  },[notify,refreshUser]);
  useEffect(()=>{if(screen==='activity'&&viewer)backend.activity(viewer.id).then(setActivities).catch(e=>notify(e.message,true));},[screen,viewer,items,notify]);
+ useEffect(()=>{if(!canViewCatalogue(viewer))return;const timer=window.setInterval(()=>void refresh().catch(()=>{}),15000);return()=>window.clearInterval(timer)},[viewer?.id,viewer?.verified,refresh]);
  const access=canViewCatalogue(viewer);
  const filtered=useMemo(()=>{
   if(!access)return [];
@@ -248,7 +250,7 @@ export default function App(){
  const show=(s:Screen)=>{if(s!=='explore'&&!access){if(!viewer)setAuth('login');else notify('Tu cuenta está pendiente de activación.',true);return;}if(s==='admin'&&viewer?.role!=='admin'){notify('Esta área es exclusiva de administración.',true);return;}setScreen(s);setProfileTarget(null);setMenu(false);window.scrollTo({top:0,behavior:'smooth'})};
  const openCreate=()=>{if(!viewer){setAuth('signup');return;}if(!viewer.verified){notify('Tu cuenta necesita verificación del administrador antes de publicar.',true);return;}setCreating(true)};
  const viewProfile=(user:Profile)=>{setProfileTarget(user);setScreen('profile');setSelected(null);window.scrollTo({top:0,behavior:'smooth'})};
- const logout=async()=>{try{await backend.logout();setViewer(null);setItems([]);setSelected(null);setProfileTarget(null);setActivities({entries:[],bids:[]});setScreen('explore');notify('Sesión cerrada.')}catch(e){notify(e instanceof Error?e.message:'Error',true)}};
+ const logout=async()=>{try{await backend.logout();setViewer(null);setNeedsEnrollment(false);setItems([]);setSelected(null);setProfileTarget(null);setActivities({entries:[],bids:[]});setScreen('explore');notify('Sesión cerrada.')}catch(e){notify(e instanceof Error?e.message:'Error',true)}};
  const myListings=access?items.filter(l=>l.owner_id===viewer?.id):[],totalActive=access?items.filter(isLive).length:0;
  return <><header className="site-header"><div className="nav-container"><button className="logo" onClick={()=>show('explore')} aria-label="ScoutRifas CHN inicio"><span className="logo-mark"><Fleur size={29}/></span><span className="logo-name">SCOUT<span>RIFAS</span><small>CHIHUAHUA NORTE</small></span></button>
  <nav className={menu?'nav-links open':'nav-links'}><button className={screen==='explore'?'nav-active':''} onClick={()=>show('explore')}>Explorar</button>{access&&<><button onClick={()=>show('mine')} className={screen==='mine'?'nav-active':''}>Mis publicaciones</button><button onClick={()=>show('activity')} className={screen==='activity'?'nav-active':''}>Mi actividad</button></>}{access&&viewer?.role==='admin'&&<button onClick={()=>show('admin')} className={screen==='admin'?'nav-active':''}>Administración</button>}</nav>
@@ -272,6 +274,7 @@ export default function App(){
  </main>
  <footer className="footer"><div className="footer-top"><div className="footer-brand"><div className="logo-mark"><Fleur size={27}/></div><div><b>SCOUTRIFAS <span>CHN</span></b><p>Una comunidad que comparte, explora y crece.</p></div></div><div className="footer-links"><button onClick={()=>show('explore')}>Inicio</button>{access&&<><button onClick={()=>show('mine')}>Mis publicaciones</button><button onClick={openCreate}>Crear publicación</button></>}</div></div><div className="footer-bottom"><span>© {new Date().getFullYear()} ScoutRifas CHN · Proyecto comunitario.</span><span>Sin pagos en la plataforma · No es un sitio oficial de ASMAC salvo autorización expresa.</span></div></footer>
  {toast&&<div className={`toast ${toast.error?'error':''}`} role="status">{toast.error?<Flag size={18}/>:<CheckCircle2 size={18}/>} {toast.text}<button onClick={()=>setToast(null)} aria-label="Cerrar mensaje"><X size={16}/></button></div>}
+ {needsEnrollment&&!auth&&!loading&&<Modal onClose={()=>{void backend.logout().then(refreshUser)}}><ExistingMemberJoin done={refreshUser} cancel={async()=>{await backend.logout();await refreshUser()}} notify={notify}/></Modal>}
  {auth&&<Modal onClose={()=>setAuth(null)}><Authentication mode={auth} setMode={setAuth} onClose={()=>setAuth(null)} onSuccess={refreshUser} notify={notify}/></Modal>}
  {creating&&viewer&&<Modal width="680px" onClose={()=>setCreating(false)}><CreateListing user={viewer} onClose={()=>setCreating(false)} done={refresh} notify={notify}/></Modal>}
  {selected&&access&&<Modal width="880px" onClose={()=>setSelected(null)}><Detail item={selected} user={viewer} onClose={()=>setSelected(null)} onLogin={()=>setAuth('signup')} refresh={refresh} notify={notify} onProfile={viewProfile}/></Modal>}
