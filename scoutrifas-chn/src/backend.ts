@@ -176,6 +176,24 @@ export const backend={
     if(error)throw error;
     return Boolean(user);
   },
+  async bidHistory(listingId:string):Promise<Activity[]>{
+    if(!supabase)return demoEnabled?state().bids.filter(b=>b.listing_id===listingId).sort((a,b)=>new Date(b.created_at||'').getTime()-new Date(a.created_at||'').getTime()):[];
+    const r=await supabase.from('chn_bids').select('*').eq('listing_id',listingId).order('created_at',{ascending:false}).limit(50);
+    if(r.error)throw r.error;
+    return (r.data||[]) as Activity[];
+  },
+  async allAdminBids():Promise<Activity[]>{
+    if(!supabase)throw new Error('Administración no disponible.');
+    const result:Activity[]=[];
+    for(let offset=0;offset<25000;offset+=1000){
+      const r=await supabase.from('chn_bids').select('*').order('created_at',{ascending:false}).range(offset,offset+999);
+      if(r.error)throw r.error;
+      const chunk=(r.data||[]) as Activity[];
+      result.push(...chunk);
+      if(chunk.length<1000)return result;
+    }
+    throw new Error('El historial excede 25,000 pujas. Exporta por periodos desde Supabase.');
+  },
   async adminOverview():Promise<{bids:Activity[];entries:Activity[];bidCount:number;entryCount:number}>{
     if(!supabase)throw new Error('Administración no disponible.');
     const [b,e,bc,ec]=await Promise.all([
