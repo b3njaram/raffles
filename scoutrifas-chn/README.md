@@ -2,7 +2,7 @@
 
 Plataforma comunitaria **Scouts Chihuahua Norte** para **rifas gratuitas** y **subastas con pujas registradas**, SIN procesar pagos. Diseño responsivo con buscador, filtros, fotos y perfiles.
 
-> **Estado de entrega:** aplicación + esquema Supabase + lógica de acceso listas para conectar; el **modo demo** guarda datos en `localStorage` y NO es multiusuario ni tiene autenticación real. Para producción hace falta un proyecto Supabase nuevo, aplicar la migración, configurar la autenticación y verificar las políticas de organización. No confundir el modo demo con producción.
+> **Estado:** desplegado en https://scoutrifas-chn.vercel.app con Supabase compartido y tablas CHN aisladas. Los registros, pujas y publicaciones se almacenan en PostgreSQL. Para operar, hay que verificar miembros y promover manualmente la primera cuenta administradora. El modo demo solo está disponible en desarrollo si se activa expresamente.
 
 ## Funcionalidades
 
@@ -12,7 +12,7 @@ Plataforma comunitaria **Scouts Chihuahua Norte** para **rifas gratuitas** y **s
 - Publicación con hasta 4 fotos (JPG/PNG/WebP, máximo 5 MB), categorías, cupos/fecha y aprobación antes de mostrarse.
 - Rifas: participaciones **gratuitas** limitadas por usuario y cupos, asignación de ganador al cerrar por admin.
 - Subastas: pujas informativas en MXN, sin cobro online; incremento mínimo validado de manera atómica en PostgreSQL.
-- Panel admin: verificar/revocar miembros, aprobar/pausar/cancelar publicaciones, finalizar vencidas y registrar resultado.
+- Panel admin: métricas, progreso por publicación, registro de pujas (hasta los últimos 1,000 en interfaz), lista de participantes, exportación CSV, verificación de miembros, aprobación/pausa/cancelación de publicaciones y cierre de sorteos.
 - RLS, roles no editables por usuarios, RPCs transaccionales, límites de fotos, ninguna clave de servicio en frontend.
 - Portada pública sin catálogo, resultados, fotos ni nombres de rifas. Solo miembros aprobados consultan el catálogo (RLS en Postgres).
 - Fotografías de rifas/subastas en bucket **privado**; se muestran mediante enlaces firmados de 10 minutos para miembros aprobados. Avatares son públicos.
@@ -28,7 +28,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Sin configurar Supabase la app ejecuta **modo demo**, y sus cambios son solo del navegador actual. Pruebas:
+Sin las variables de Supabase la aplicación en producción permanece bloqueada. En desarrollo local puedes activar `VITE_DEMO_MODE=true` para una demostración sin usuarios reales. Pruebas:
 
 ```bash
 npm run check
@@ -36,12 +36,12 @@ npm run check
 
 ## Conectar Supabase (Supabase compartido con Study Compass)
 
-1. Usa el proyecto Supabase existente `ciarlxdhhrsrkpdkyqfi`, con tablas **`public.chn_*`** separadas. La migración correcta es `supabase/migrations/20261108174100_shared_supabase_chn.sql`; **NO ejecutes** la migración antigua de proyecto vacío.n SQL Editor ejecuta `supabase/migrations/20261108120000_initial.sql` en ese proyecto vacío. La migración crea tablas, permisos, políticas RLS, dos buckets de Storage (uno privado) y funciones RPC.
+1. Se está reutilizando el proyecto Supabase `ciarlxdhhrsrkpdkyqfi`, con tablas `public.chn_*` independientes de Study Compass. El esquema compartido está en `supabase/migrations/20261108174100_shared_supabase_chn.sql` y ya fue aplicado.
 2. En Auth > Providers > Email, activa confirmación por email y establece la Site URL correcta y las Redirect URLs de tu dominio de Vercel (o `http://localhost:5173` para desarrollo). Configura SMTP de producción para entrega consistente.
-3. En Vercel establece `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY` (clave pública). Jamás subir `service_role` al repositorio.nte). No uses `service_role`/secret keys en cliente. `VITE_DEMO_MODE` no afecta la detección de backend: la presencia de las dos variables habilita Supabase.
-4. En producción configura las mismas variables en tu cuenta de Vercel, conecta el proyecto a la subcarpeta del repositorio, y despliega. En Vercel: Framework `Vite`, Build `npm run build`, Output `dist`.
-5. Registra un usuario con ID scout desde la UI. Para convertirlo en el **primer administrador**, con permisos de propietario desde SQL Editor ejecuta: `UPDATE public.chn_profiles SET role='admin', verified=true WHERE scout_id='CHN-TUIDAQUI'` (reemplaza el ID por el real). Nunca promociones usuarios desde frontend.nistrador manualmente** desde SQL Editor del nuevo proyecto: `UPDATE public.chn_profiles SET role='admin', verified=true WHERE scout_id='CHN-000123';` (sustituye por tu ID real). Nunca pongas esta instrucción dentro del frontend. Verifica la identidad de la persona antes de elevarla.
-6. Los demás usuarios deben registrarse; el admin revisa su identidad por un canal seguro y marca el ID como verificado. Solo pueden participar o publicar tras la aprobación. Los nuevos anuncios también requieren autorización.
+3. Las variables `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY` ya están en Vercel. La publishable key es segura para frontend; nunca uses una clave `service_role` en el cliente.
+4. El proyecto Vercel está conectado a GitHub (`b3njaram/raffles`), con carpeta raíz `scoutrifas-chn`, framework Vite y comando de verificación `npm run check`.
+5. Registra tu cuenta en la web usando tu ID scout y confirma el email. Una vez verificada tu identidad, el propietario puede promoverla en Supabase SQL Editor: `UPDATE public.chn_profiles SET role='admin', verified=true WHERE scout_id='CHN-TUIDREAL';` (reemplaza por tu ID). No hay administrador predeterminado ni contraseña universal.
+6. La cuenta administradora verifica a los demás miembros, aprueba las publicaciones, revisa todas las pujas, registra participaciones y cierra rifas vencidas.
 
 ## Seguridad y límites
 
@@ -75,16 +75,16 @@ Si este proyecto está bajo `scoutrifas-chn/` en un monorepo existente, seleccio
 
 ## Visibilidad del catálogo y comprobación
 
-El catálogo no se carga antes de que `auth.getUser()` y la fila propia de `public.chn_profiles` confirmen la sesión y `verified=true`. La interfaz muestra únicamente una bienvenida genérica para visitantes o miembros pendientes, sin mencionar el requisito técnico del identificador. **La verdadera restricción está en PostgreSQL**: `anon` no tiene `SELECT`, y una sesión no verificada no puede consultar `listings`, otros perfiles ni imágenes privadas. Cambiar el frontend no evade RLS.
+El catálogo no se carga antes de `auth.getUser()` y de que `public.chn_profiles` confirme el usuario y su verificación. La portada es genérica; no anuncia el requisito de acceso. PostgreSQL RLS exige autenticación y membresía verificada. Las tablas `chn_listings`, `chn_bids`, `chn_raffle_entries` y `chn_profiles` son independientes.
 
-Las fotos de publicaciones usan `scout-listings` (`public=false`) y URLs firmadas válidas por 10 minutos. Los avatares se guardan en `scout-photos` (`public=true`). Para un sitio de acceso prolongado, añade renovación de URLs antes de su vencimiento.
+Las fotos de publicaciones usan el bucket privado `chn-listings` y URLs firmadas de 10 minutos; los avatares usan el bucket público `chn-avatars`. Las firmas se renuevan al refrescar el catálogo.
 
-Para preparar una base totalmente nueva, **no reutilices** `Study Compass 1881`. La creación de un proyecto nuevo requiere seleccionar explícitamente una organización y validar si la creación añade costos. A partir de allí se ejecuta la migración y se configurarán las credenciales públicas.
+Study Compass conserva sus propias tablas y consultas. La migración CHN **no** reemplaza ni modifica esas tablas. Ambos proyectos comparten autenticación Supabase, pero los perfiles de ScoutRifas están separados.
 
 ## Despliegue activo compartido (2026-11-08)
 
 - Proyecto Supabase: `ciarlxdhhrsrkpdkyqfi` (compartido con Study Compass, **tablas independientes**).
 - Tablas `chn_profiles`, `chn_listings`, `chn_raffle_entries`, `chn_bids`, `chn_draw_audit`; funciones `chn_*`; depósitos `chn-avatars` y `chn-listings` (privado).
-- Para que una cuenta existente de Study Compass se una, inicia sesión y completa el registro CHN; requiere revisión administrativa.
+- Las cuentas ya existentes de Study Compass pueden iniciar sesión y completar el perfil de ScoutRifas mediante la función controlada `chn_register_member`. Esto no cambia su perfil Study Compass.
 - Panel admin con historial de pujas, participantes, progreso, gestión de miembros y publicaciones.
 - No hay admin predeterminado ni contraseñas de acceso ocultas. El primer admin debe ser autorizado por el propietario del proyecto.
