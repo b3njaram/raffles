@@ -135,21 +135,87 @@ function ProfilePage({person,current,onSave,notify,listings,onOpen}:{person:Prof
  <div className="public-listings"><h3>Publicaciones de {person.display_name.split(' ')[0]}</h3>{listings.length?<div className="cards-grid">{listings.map(l=><Card key={l.id} item={l} onOpen={()=>onOpen(l)}/>)}</div>:<p className="empty-small">Sin publicaciones públicas por ahora.</p>}</div></section>;
 }
 
+
 function Admin({items,refresh,notify}:{items:Listing[];refresh:()=>Promise<void>;notify:(s:string,e?:boolean)=>void}){
- const [members,setMembers]=useState<Profile[]>([]),[busy,setBusy]=useState(''),[tab,setTab]=useState<'publications'|'people'>('publications');
- const reload=useCallback(()=>backend.members().then(setMembers).catch(e=>notify(e.message,true)),[notify]);
- useEffect(()=>{void reload()},[reload]);
- const pending=items.filter(x=>x.status==='pending'),live=items.filter(x=>x.status==='active');
- const review=async(id:string,action:'active'|'paused'|'cancelled')=>{setBusy(id);try{await backend.reviewListing(id,action);await refresh();notify('Publicación actualizada.');}catch(e){notify(e instanceof Error?e.message:'Error',true)}finally{setBusy('')}};
- const finish=async(id:string)=>{if(!window.confirm('¿Confirmas cerrar y registrar el resultado? Esta acción no se puede revertir.'))return;
-  setBusy(id);try{await backend.finish(id);await refresh();notify('Resultado registrado y publicado.')}catch(e){notify(e instanceof Error?e.message:'Error',true)}finally{setBusy('')}};
- const verify=async(id:string,value:boolean)=>{setBusy(id);try{await backend.reviewUser(id,value);await reload();notify('Estado del usuario actualizado.')}catch(e){notify(e instanceof Error?e.message:'Error',true)}finally{setBusy('')}};
- return <section className="admin-view"><div className="section-title"><div><span className="kicker">CENTRO DE CONTROL</span><h2>Panel de administración</h2><p>Protege a tu comunidad y mantén cada actividad en orden.</p></div><ShieldCheck size={38} className="admin-shield"/></div>
- <div className="stat-grid"><div className="stat"><Ticket/><b>{items.length}</b><span>Publicaciones</span></div><div className="stat"><Clock3/><b>{pending.length}</b><span>Por revisar</span></div><div className="stat"><Users/><b>{members.length}</b><span>Usuarios</span></div><div className="stat"><TrendingUp/><b>{live.length}</b><span>Activas</span></div></div>
- <div className="tabs admin-tabs"><button className={tab==='publications'?'active':''} onClick={()=>setTab('publications')}>Publicaciones ({pending.length})</button><button className={tab==='people'?'active':''} onClick={()=>setTab('people')}>Usuarios ({members.filter(x=>!x.verified).length} por verificar)</button></div>
- {tab==='publications'?<div className="admin-list">{items.filter(x=>x.status!=='finished'&&x.status!=='cancelled').map(l=><div className="admin-line" key={l.id}><img src={imageUrl(l.image_paths[0])||sampleHero} alt=""/><div className="grow"><b>{l.title}</b><p>{l.owner?.display_name||'Scout'} · {l.type==='raffle'?'Rifa':'Subasta'} · {new Date(l.end_at).toLocaleString('es-MX')}</p><Status status={l.status}/></div><div className="admin-actions">{(l.status==='pending'||l.status==='paused')&&<button disabled={!!busy} onClick={()=>review(l.id,'active')} className="small-approve"><Check size={15}/> Aprobar</button>}{l.status==='active'&&<button disabled={!!busy} onClick={()=>review(l.id,'paused')}>Pausar</button>}{l.status==='active'&&new Date(l.end_at).getTime()<=Date.now()&&<button disabled={!!busy} onClick={()=>finish(l.id)}>Cerrar y resolver</button>}<button disabled={!!busy} className="danger" onClick={()=>review(l.id,'cancelled')}>Cancelar</button></div></div>)}{items.filter(x=>!['finished','cancelled'].includes(x.status)).length===0&&<div className="empty-small">No hay publicaciones que moderar.</div>}</div>:
- <div className="admin-list">{members.map(m=><div className="admin-line user-line" key={m.id}><Avatar user={m} size={48}/><div className="grow"><b>{m.display_name}</b><p>{m.scout_id} · {m.group_name||'Sin grupo'}</p>{m.role==='admin'&&<span className="verified">Administrador</span>}</div><div className="admin-actions">{m.verified?<span className="verified"><CheckCircle2 size={15}/> Verificado</span>:<span className="pending">Pendiente</span>}{m.role!=='admin'&&<button disabled={!!busy} className={m.verified?'danger':'small-approve'} onClick={()=>verify(m.id,!m.verified)}>{m.verified?'Revocar':'Validar ID'}</button>}</div></div>)}</div>}
- <div className="notice admin-disclaimer"><ShieldCheck size={20}/> Solo personas autorizadas deben verificar los registros CHN. Verifica identidad y pertenencia por un canal externo antes de aprobar.</div></section>;
+ const [members,setMembers]=useState<Profile[]>([]);
+ const [report,setReport]=useState<{bids:Activity[];entries:Activity[];bidCount:number;entryCount:number}>({bids:[],entries:[],bidCount:0,entryCount:0});
+ const [busy,setBusy]=useState(''),[tab,setTab]=useState<'publications'|'bids'|'entries'|'people'>('publications'),[search,setSearch]=useState('');
+ const [updated,setUpdated]=useState<Date|null>(null);
+ const reload=useCallback(async()=>{try{
+    const [people,info]=await Promise.all([backend.members(),backend.adminOverview()]);
+    setMembers(people);setReport(info);setUpdated(new Date());
+   }catch(err){notify(err instanceof Error?err.message:'Error de estadísticas',true)}
+ },[notify]);
+ useEffect(()=>{void reload();const t=window.setInterval(()=>{void reload();void refresh().catch(()=>{})},15000);return()=>window.clearInterval(t)},[reload,refresh]);
+ const pending=items.filter(l=>l.status==='pending'),live=items.filter(l=>l.status==='active');
+ const people=new Map(members.map(m=>[m.id,m]));
+ const listings=new Map(items.map(l=>[l.id,l]));
+ const q=search.trim().toLocaleLowerCase('es');
+ const includes=(parts:Array<string|number|undefined>)=>!q||parts.join(' ').toLocaleLowerCase('es').includes(q);
+ const review=async(id:string,action:'active'|'paused'|'cancelled')=>{setBusy(id);try{await backend.reviewListing(id,action);await Promise.all([reload(),refresh()]);notify('Publicación actualizada.')}catch(err){notify(err instanceof Error?err.message:'Error',true)}finally{setBusy('')}};
+ const finish=async(id:string)=>{if(!window.confirm('¿Confirmas el cierre y resultado final?'))return;setBusy(id);try{await backend.finish(id);await Promise.all([reload(),refresh()]);notify('Resultado registrado.')}catch(err){notify(err instanceof Error?err.message:'Error',true)}finally{setBusy('')}};
+ const verify=async(id:string,value:boolean)=>{setBusy(id);try{await backend.reviewUser(id,value);await reload();notify('Estado de miembro actualizado.')}catch(err){notify(err instanceof Error?err.message:'Error',true)}finally{setBusy('')}};
+ const csv=()=>{
+  const cell=(x:unknown)=>'"'+String(x??'').replace(/"/g,'""').replace(/^[=+\-@]/,"'$&")+'"';
+  const rows=[['Fecha','Publicación','Nombre','ID scout','Puja MXN'],...report.bids.map(b=>[b.created_at||'',listings.get(b.listing_id)?.title||'',people.get(b.user_id)?.display_name||'',people.get(b.user_id)?.scout_id||'',b.amount||0])];
+  const data=String.fromCharCode(65279)+rows.map(row=>row.map(cell).join(',')).join('\r\n');
+  const url=URL.createObjectURL(new Blob([data],{type:'text/csv;charset=utf-8'}));
+  const link=document.createElement('a');link.href=url;link.download='pujas-scout-chn.csv';link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+ };
+ return <section className="admin-view">
+ <div className="section-title"><div><span className="kicker">CENTRO DE CONTROL</span><h2>Panel de administración</h2><p>Pujas, registros, progreso y revisiones en un solo lugar.</p></div><ShieldCheck size={38} className="admin-shield"/></div>
+ <div className="stat-grid chn-stats">
+  <div className="stat"><Ticket/><b>{items.length}</b><span>Publicaciones</span></div>
+  <div className="stat"><Clock3/><b>{pending.length}</b><span>Por revisar</span></div>
+  <div className="stat"><TrendingUp/><b>{report.bidCount}</b><span>Pujas registradas</span></div>
+  <div className="stat"><Users/><b>{report.entryCount}</b><span>Participaciones</span></div>
+  <div className="stat"><ShieldCheck/><b>{members.filter(m=>m.verified).length}/{members.length}</b><span>Miembros verificados</span></div>
+  <div className="stat"><BarChart3/><b>{live.length}</b><span>Actividades abiertas</span></div>
+ </div>
+ <div className="admin-toolbar"><small>Actualización automática cada 15 segundos{updated?' · '+updated.toLocaleTimeString('es-MX'):''}</small><button className="secondary" type="button" onClick={()=>{void refresh();void reload()}}>Actualizar ahora</button></div>
+ <h3>Progreso por publicación</h3>
+ <div className="admin-progress">{items.filter(l=>['active','finished'].includes(l.status)).slice(0,15).map(l=><div className="progress-row" key={l.id}>
+  <div><b>{l.title}</b><small>{l.type==='raffle'?String(l.entry_count)+' / '+String(l.max_entries)+' participantes':String(l.bid_count)+' pujas · '+money(l.current_bid||l.min_bid)+' MXN'} · {l.owner?.display_name||'Scout'}</small></div>
+  {l.type==='raffle'?<div className="progress-track"><span style={{width:String(Math.min(100,100*l.entry_count/l.max_entries))+'%'}}/></div>:<span className="bid-spark"><TrendingUp size={17}/>{l.status==='active'?'En progreso':'Cerrada'}</span>}
+ </div>)}{!items.length&&<p className="empty-small">Todavía no hay actividades. Las nuevas publicaciones aparecerán aquí.</p>}</div>
+ <div className="tabs admin-tabs">
+  <button className={tab==='publications'?'active':''} onClick={()=>setTab('publications')}>Publicaciones ({pending.length})</button>
+  <button className={tab==='bids'?'active':''} onClick={()=>setTab('bids')}>Pujas ({report.bidCount})</button>
+  <button className={tab==='entries'?'active':''} onClick={()=>setTab('entries')}>Participantes ({report.entryCount})</button>
+  <button className={tab==='people'?'active':''} onClick={()=>setTab('people')}>Usuarios ({members.filter(m=>!m.verified).length} pendientes)</button>
+ </div>
+ <div className="admin-filter"><label className="search-field"><Search size={18}/><input aria-label="Buscar en administración" placeholder="Buscar título, usuario o ID" value={search} onChange={e=>setSearch(e.target.value)}/></label>{tab==='bids'&&<button className="secondary" type="button" onClick={csv}>Exportar CSV</button>}</div>
+ {tab==='publications'&&<div className="admin-list">{items.filter(l=>includes([l.title,l.owner?.display_name,l.category,l.status])).map(l=><div className="admin-line" key={l.id}>
+   <img src={imageUrl(l.image_paths[0])||sampleHero} alt=""/>
+   <div className="grow"><b>{l.title}</b><p>{l.owner?.display_name||'Scout'} · {l.type==='raffle'?'Rifa':'Subasta'} · {new Date(l.end_at).toLocaleString('es-MX')}</p><Status status={l.status}/><div className="mini-metrics">{l.type==='auction'?String(l.bid_count)+' pujas · '+money(l.current_bid||l.min_bid):String(l.entry_count)+' / '+String(l.max_entries)+' participantes'}</div></div>
+   <div className="admin-actions">{(l.status==='pending'||l.status==='paused')&&<button disabled={!!busy} onClick={()=>review(l.id,'active')} className="small-approve"><Check size={15}/> Aprobar</button>}
+   {l.status==='active'&&<button disabled={!!busy} onClick={()=>review(l.id,'paused')}>Pausar</button>}
+   {l.status==='active'&&new Date(l.end_at).getTime()<=Date.now()&&<button disabled={!!busy} onClick={()=>finish(l.id)}>Cerrar y resolver</button>}
+   {['pending','paused','active'].includes(l.status)&&<button disabled={!!busy} className="danger" onClick={()=>review(l.id,'cancelled')}>Cancelar</button>}
+   </div></div>)}{!items.length&&<p className="empty-small">Todavía no hay publicaciones.</p>}</div>}
+ {tab==='bids'&&<div className="admin-list">{report.bids.filter(b=>includes([listings.get(b.listing_id)?.title,people.get(b.user_id)?.display_name,people.get(b.user_id)?.scout_id,b.amount])).slice(0,250).map(b=><div className="admin-line chn-history" key={b.id}>
+  <div className="history-symbol"><TrendingUp size={21}/></div><div className="grow"><b>{listings.get(b.listing_id)?.title||'Subasta archivada'}</b><p>{people.get(b.user_id)?.display_name||'Miembro'} · {people.get(b.user_id)?.scout_id||'ID reservado'} · {new Date(b.created_at||'').toLocaleString('es-MX')}</p></div><b className="history-amount">{money(b.amount||0)}</b></div>)}
+  {!report.bids.length&&<p className="empty-small">No hay pujas todavía.</p>}{report.bidCount>1000&&<p className="empty-small">Historial reciente (1,000). Para consultar más registros usa la base de datos.</p>}</div>}
+ {tab==='entries'&&<div className="admin-list">{report.entries.filter(e=>includes([listings.get(e.listing_id)?.title,people.get(e.user_id)?.display_name,people.get(e.user_id)?.scout_id])).slice(0,250).map(e=><div className="admin-line chn-history" key={e.id}>
+  <div className="history-symbol"><Ticket size={21}/></div><div className="grow"><b>{listings.get(e.listing_id)?.title||'Rifa archivada'}</b><p>{people.get(e.user_id)?.display_name||'Miembro'} · {people.get(e.user_id)?.scout_id||'ID reservado'} · {new Date(e.joined_at||'').toLocaleString('es-MX')}</p></div><span className="verified">Registrado</span></div>)}
+  {!report.entries.length&&<p className="empty-small">No hay participaciones todavía.</p>}</div>}
+ {tab==='people'&&<div className="admin-list">{members.filter(m=>includes([m.display_name,m.scout_id,m.group_name])).map(m=><div className="admin-line user-line" key={m.id}><Avatar user={m} size={48}/><div className="grow"><b>{m.display_name}</b><p>{m.scout_id} · {m.group_name||'Sin grupo'}</p>{m.role==='admin'&&<span className="verified">Administrador</span>}</div>
+  <div className="admin-actions">{m.verified?<span className="verified"><CheckCircle2 size={15}/> Verificado</span>:<span className="pending">Pendiente</span>}{m.role!=='admin'&&<button disabled={!!busy} className={m.verified?'danger':'small-approve'} onClick={()=>verify(m.id,!m.verified)}>{m.verified?'Revocar':'Validar ID'}</button>}</div></div>)}</div>}
+ <div className="notice admin-disclaimer"><ShieldCheck size={20}/> Aprueba identidades por un canal independiente. Las pujas no procesan pagos.</div>
+ </section>;
+}
+
+function ExistingMemberJoin({done,cancel,notify}:{done:()=>Promise<void>;cancel:()=>Promise<void>;notify:(s:string,e?:boolean)=>void}){
+ const [name,setName]=useState(''),[id,setId]=useState('CHN-'),[group,setGroup]=useState(''),[busy,setBusy]=useState(false);
+ const submit=async(e:FormEvent)=>{e.preventDefault();if(busy)return;if(!isScoutId(id)){notify('Introduce un ID scout válido.',true);return;}
+  setBusy(true);try{await backend.enrollExisting(formatId(id),name.trim(),group.trim());await done();notify('Perfil creado y enviado a revisión.')}catch(err){notify(err instanceof Error?err.message:'No se pudo vincular.',true)}finally{setBusy(false)}
+ };
+ return <div className="auth-content"><span className="kicker">COMPLETA TU PERFIL</span><h2>Bienvenido a ScoutRifas</h2><p className="subtle">Tu sesión está activa. Completa tu perfil para unirte a esta comunidad.</p>
+  <form className="form-col" onSubmit={submit}><label>Nombre<input required minLength={2} maxLength={65} value={name} onChange={e=>setName(e.target.value)}/></label>
+  <label>ID scout<input required maxLength={16} pattern="CHN-?[A-Za-z0-9]{4,12}" value={id} onChange={e=>setId(e.target.value.toUpperCase())}/></label>
+  <label>Grupo scout (opcional)<input maxLength={70} value={group} onChange={e=>setGroup(e.target.value)}/></label>
+  <button className="primary full" disabled={busy} type="submit">{busy?'Guardando…':'Completar mi registro'} <ArrowRight size={17}/></button></form>
+  <button className="text-logout" type="button" onClick={()=>{void cancel()}}>Cambiar de cuenta</button></div>;
 }
 
 export default function App(){
