@@ -1,6 +1,6 @@
 import {useCallback,useEffect,useMemo,useState} from 'react';
 import type {FormEvent,ReactNode} from 'react';
-import {ArrowLeft,ArrowRight,BarChart3,Check,CheckCircle2,ChevronDown,Clock3,Compass,Flag,Heart,ImagePlus,LogIn,LogOut,Menu,Mountain,Plus,Search,ShieldCheck,Sparkles,Ticket,TrendingUp,Upload,Users,X} from 'lucide-react';
+import {ArrowLeft,ArrowRight,BarChart3,Check,CheckCircle2,ChevronDown,Clock3,Compass,Flag,Heart,ImagePlus,LogIn,LogOut,Menu,Mountain,Plus,Search,ShieldCheck,Sparkles,Ticket,Upload,Users,X} from 'lucide-react';
 import {backend,cloud,imageUrl,supabase} from './backend';
 import type {Category,Draft,Listing,MemberType,Profile,TicketOrder,TicketNumber,AdminReport} from './types';
 import {canPublish,canRequestTickets,canViewCatalogue,categories,defaultDraft,formatId,isLive,isScoutId,money,remaining,salesReady} from './types';

@@ -55,3 +55,60 @@ main{min-height:65vh}.hero-shell{max-width:1230px;padding:0 20px;margin:22px aut
 .bid-history>div{display:flex;justify-content:space-between;gap:12px;padding:7px 2px;border-bottom:1px solid #f1edf4}
 .bid-history small{font-size:.75rem;color:#7a7184;text-align:right}
 @media(max-width:600px){.bid-history>div{flex-wrap:wrap}.bid-history small{text-align:left}}
+
+
+/* ScoutRifas CHN • boletos y comunidad extendida */
+.chn-kind-picker{margin:8px 0 12px}
+.chn-kind-picker button{min-width:0}
+.chn-check{display:flex!important;align-items:flex-start;gap:10px;line-height:1.4;font-size:.91rem;cursor:pointer}
+.chn-check input{margin-top:3px;width:18px!important;height:18px!important;flex-shrink:0;accent-color:#70518f}
+.ticket-price-row{display:flex;justify-content:space-between;gap:12px;margin-top:16px}
+.ticket-price-row>div{display:flex;flex-direction:column;gap:5px}
+.ticket-price-row>div:last-child{text-align:right}
+.ticket-price-row small{font-size:.73rem;color:#7b7480}
+.ticket-price-row strong{font-size:1.16rem;color:#543a6a}
+.chn-card-progress{width:100%;margin:15px 0 12px;height:9px;min-width:0}
+.ticket-card-bottom{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:.8rem;color:#625373;font-weight:700}
+.ticket-detail-price{display:flex;flex-direction:column;gap:6px;background:#f7f3fa;padding:18px;border-radius:14px;margin:16px 0 12px}
+.ticket-detail-price small{color:#715e83;font-size:.8rem}
+.ticket-detail-price strong{font-size:1.95rem;color:#4f366c}
+.ticket-detail-price>span{font-size:.74rem;color:#756b80}
+.chn-detail-progress{height:11px;width:100%;margin-bottom:20px}
+.ticket-order-control{border:1px solid #e9dfee;border-radius:14px;padding:15px;margin:14px 0}
+.chn-quantity{display:flex;gap:10px;align-items:center;margin-top:10px}
+.chn-quantity button{width:44px;height:44px;border:1px solid #d7cce1;border-radius:12px;background:#f1eaf7;color:#5b4074;font-size:1.45rem;font-weight:700;cursor:pointer}
+.chn-quantity button:hover{background:#e8dff0}
+.chn-quantity input{max-width:82px;text-align:center;font-size:1.15rem;padding:10px;border-radius:12px;border:1px solid #ddd3e4}
+.ticket-total{display:flex;justify-content:space-between;align-items:center;margin:15px 0 0;font-size:.92rem}
+.ticket-total strong{color:#593b72;font-size:1.3rem}
+.chn-permit{display:flex;gap:8px;align-items:center;margin:13px 0 5px;font-size:.83rem;color:#32704f}
+.chn-rules-link{display:inline-block;margin:8px 0 14px;font-weight:650;color:#5b407d;text-decoration:underline}
+.chn-draw-fields{display:grid;grid-template-columns:minmax(90px,120px) minmax(150px,1fr);gap:9px;margin-top:11px}
+.chn-draw-fields label{display:flex;flex-direction:column;gap:5px;font-size:.78rem;color:#705e80}
+.chn-draw-fields input{width:100%;min-width:0;border-radius:9px;border:1px solid #dacfe3;padding:9px}
+.chn-draw-fields button{grid-column:span 2;justify-self:start}
+.chn-stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+.chn-stats .stat>b{font-size:1.4rem;overflow-wrap:anywhere}
+.admin-toolbar{display:flex;gap:1rem;align-items:center;justify-content:space-between;margin:1.5rem 0}
+.admin-toolbar small{color:#777085}
+.admin-progress{background:#fff;border:1px solid #e9e3ed;border-radius:16px;padding:16px 18px;margin-bottom:22px}
+.admin-progress h3{margin:4px 0 10px}
+.progress-row{display:flex;justify-content:space-between;gap:1rem;align-items:center;padding:14px 0;border-bottom:1px solid #f1edf2}
+.progress-row:last-child{border-bottom:0}
+.progress-row>div:first-child{flex:1;min-width:0}
+.progress-row b,.progress-row small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.progress-row small{margin-top:4px;font-size:.82rem;color:#777085}
+.progress-track{width:27%;min-width:80px;background:#ece5f2;height:12px;border-radius:20px;overflow:hidden}
+.progress-track span{display:block;height:100%;border-radius:20px;background:linear-gradient(90deg,#624181,#9573c5)}
+.admin-filter{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0 18px}
+.admin-filter .search-field{flex:1;max-width:450px;min-width:0}
+.chn-history{min-height:82px}
+.history-symbol{display:flex;align-items:center;justify-content:center;width:44px;height:44px;flex-shrink:0;border-radius:13px;color:#6b4588;background:#f3edf9}
+.history-amount{color:#5b367d;white-space:nowrap;font-size:1.15rem}
+.mini-metrics{font-size:.82rem;color:#6c5781;margin-top:7px}
+.detail-thumbnails{display:flex;gap:9px;padding:8px 0;overflow-x:auto}
+.detail-thumbnails button{width:62px;height:55px;border:2px solid transparent;border-radius:10px;background:#fff;overflow:hidden;cursor:pointer;padding:0;flex-shrink:0}
+.detail-thumbnails button.chosen{border-color:#8251b2}
+.detail-thumbnails img{width:100%;height:100%;object-fit:cover}
+@media(max-width:850px){.chn-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-toolbar,.admin-filter{flex-wrap:wrap}.progress-row{flex-wrap:wrap}.progress-row .progress-track{width:100%}}
+@media(max-width:500px){.ticket-price-row strong{font-size:1rem}.ticket-detail-price strong{font-size:1.6rem}.chn-kind-picker{grid-template-columns:repeat(2,minmax(0,1fr))}.chn-stats .stat>b{font-size:1.15rem}.chn-draw-fields{grid-template-columns:1fr}.chn-draw-fields button{grid-column:span 1}}
