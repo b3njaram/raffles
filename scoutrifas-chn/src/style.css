@@ -46,3 +46,12 @@ main{min-height:65vh}.hero-shell{max-width:1230px;padding:0 20px;margin:22px aut
 .detail-thumbnails button.chosen{border-color:#8251b2}
 .detail-thumbnails img{width:100%;height:100%;object-fit:cover}
 @media(max-width:760px){.chn-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-toolbar,.admin-filter{flex-wrap:wrap}.progress-row{flex-wrap:wrap}.progress-track{width:100%}.history-amount{font-size:1rem}}
+
+.bid-quick{display:flex;gap:9px;flex-wrap:wrap;margin:9px 0 14px}
+.bid-quick button{padding:8px 13px;border-radius:10px;border:1px solid #d9d2e3;background:#f7f3fa;color:#614678;font-weight:650;cursor:pointer}
+.bid-quick button:hover{background:#eae1f3}
+.bid-history{padding:12px 0;border-top:1px solid #eae5ed;margin-top:12px}
+.bid-history>b{display:block;margin-bottom:8px;color:#543b67}
+.bid-history>div{display:flex;justify-content:space-between;gap:12px;padding:7px 2px;border-bottom:1px solid #f1edf4}
+.bid-history small{font-size:.75rem;color:#7a7184;text-align:right}
+@media(max-width:600px){.bid-history>div{flex-wrap:wrap}.bid-history small{text-align:left}}
