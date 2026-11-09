@@ -58,7 +58,7 @@ async function authorizeListingPhotos(list:Listing[]){
   .filter(path=>(signedListingImages.get(path)?.expires||0)<now+60_000);
  if(!paths.length)return;
  await Promise.all(paths.map(async path=>{
-  const {data,error}=await supabase!.storage.from('scout-listings').createSignedUrl(path,600);
+  const {data,error}=await supabase!.storage.from('chn-listings').createSignedUrl(path,600);
   if(error)throw error;
   signedListingImages.set(path,{url:data.signedUrl,expires:Date.now()+600_000});
  }));
@@ -68,22 +68,22 @@ export const imageUrl=(path:string|null|undefined)=>{
  if((/^https:\/\//.test(path)||/^data:image\/(png|jpeg|webp);base64,/.test(path))&&demoEnabled)return path;
  if(!supabase)return '';
  if(privateListingPhoto(path))return signedListingImages.get(path)?.url||'';
- return supabase.storage.from('scout-photos').getPublicUrl(path).data.publicUrl;
+ return supabase.storage.from('chn-avatars').getPublicUrl(path).data.publicUrl;
 };
 export const backend={
   async session():Promise<Profile|null> {
     if(!supabase) return demoEnabled ? state().user : null;
     const {data:{user},error}=await supabase.auth.getUser();
     if(error || !user) return null;
-    const r=await supabase.from('profiles').select('*').eq('id',user.id).single();
-    if(r.error) throw r.error; return r.data as Profile;
+    const r=await supabase.from('chn_profiles').select('*').eq('id',user.id).maybeSingle();
+    if(r.error) throw r.error; return (r.data as Profile|null) || null;
   },
   async list():Promise<Listing[]> {
     if(!supabase)return canViewCatalogue(state().user) ? [...state().listings] : [];
     // Comprobación redundante: Supabase RLS es la barrera de seguridad definitiva.
     const member=await backend.session();
     if(!canViewCatalogue(member))return [];
-    const r=await supabase.from('listings').select('*, owner:profiles!listings_owner_id_fkey(*)').order('created_at',{ascending:false}).limit(150);
+    const r=await supabase.from('chn_listings').select('*, owner:chn_profiles!chn_listings_owner_id_fkey(*)').order('created_at',{ascending:false}).limit(150);
     if(r.error)throw r.error;
     const listings=r.data as Listing[];
     await authorizeListingPhotos(listings);
@@ -106,7 +106,7 @@ export const backend={
   async logout(){signedListingImages.clear();if(!supabase){if(demoEnabled){state().user=null;save();}return;} const r=await supabase.auth.signOut();if(r.error)throw r.error;},
   async updateProfile(id:string, updates:Partial<Pick<Profile,'display_name'|'group_name'|'bio'|'avatar_path'>>){
     if(!supabase){if(!demoEnabled)throw new Error('Servicio no disponible.');const s=state();if(!s.user||s.user.id!==id)throw new Error('Sesión inválida');s.user={...s.user,...updates};save();return;}
-    const r=await supabase.from('profiles').update(updates).eq('id',id);if(r.error)throw r.error;
+    const r=await supabase.from('chn_profiles').update(updates).eq('id',id);if(r.error)throw r.error;
   },
   async upload(file:File,userId:string,folder:'avatars'|'listings'){
     if(!['image/jpeg','image/png','image/webp'].includes(file.type)) throw new Error('Solo JPG, PNG o WebP.');
@@ -114,7 +114,7 @@ export const backend={
     if(!supabase){if(!demoEnabled)throw new Error('Servicio no disponible.');return await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(new Error('No se pudo leer la foto.'));reader.readAsDataURL(file);});}
     const ext=file.type==='image/png'?'png':file.type==='image/webp'?'webp':'jpg';
     const path=`${userId}/${folder}/${crypto.randomUUID()}.${ext}`;
-    const bucket=folder==='listings'?'scout-listings':'scout-photos';
+    const bucket=folder==='listings'?'chn-listings':'chn-avatars';
     const r=await supabase.storage.from(bucket).upload(path,file,{contentType:file.type,upsert:false});
     if(r.error)throw r.error;return path;
   },
@@ -127,7 +127,7 @@ export const backend={
         min_bid:d.type==='raffle'?0:d.min_bid};
       state().listings.unshift(l);save();return;
     }
-    const r=await supabase.from('listings').insert({owner_id:user.id,...d,
+    const r=await supabase.from('chn_listings').insert({owner_id:user.id,...d,
       min_bid:d.type==='raffle'?0:d.min_bid,image_paths:images});if(r.error)throw r.error;
   },
   async join(l:Listing,user:Profile){
@@ -141,7 +141,7 @@ export const backend={
       s.entries.push({id:crypto.randomUUID(),listing_id:l.id,user_id:user.id,joined_at:new Date().toISOString()});
       s.listings=s.listings.map(x=>x.id===l.id?{...x,entry_count:x.entry_count+1}:x);save();return;
     }
-    const r=await supabase.rpc('join_raffle',{p_listing:l.id});if(r.error)throw r.error;
+    const r=await supabase.rpc('chn_join_raffle',{p_listing:l.id});if(r.error)throw r.error;
   },
   async bid(l:Listing,user:Profile,amount:number){
     if(!user.verified)throw new Error('Tu ID CHN requiere validación.');
@@ -155,27 +155,49 @@ export const backend={
       s.bids.push({id:crypto.randomUUID(),listing_id:l.id,user_id:user.id,amount,created_at:new Date().toISOString()});
       s.listings[idx]={...live,current_bid:amount,bid_count:live.bid_count+1};save();return;
     }
-    const r=await supabase.rpc('place_bid',{p_listing:l.id,p_amount:amount});if(r.error)throw r.error;
+    const r=await supabase.rpc('chn_place_bid',{p_listing:l.id,p_amount:amount});if(r.error)throw r.error;
   },
   async activity(userId:string):Promise<{entries:Activity[];bids:Activity[]}>{
     if(!supabase)return {entries:(demoEnabled?state().entries:[]).filter(x=>x.user_id===userId),bids:(demoEnabled?state().bids:[]).filter(x=>x.user_id===userId)};
     const [e,b]=await Promise.all([
-      supabase.from('raffle_entries').select('*').eq('user_id',userId).order('joined_at',{ascending:false}),
-      supabase.from('bids').select('*').eq('user_id',userId).order('created_at',{ascending:false})
+      supabase.from('chn_raffle_entries').select('*').eq('user_id',userId).order('joined_at',{ascending:false}),
+      supabase.from('chn_bids').select('*').eq('user_id',userId).order('created_at',{ascending:false})
     ]);if(e.error)throw e.error;if(b.error)throw b.error;
     return {entries:e.data as Activity[],bids:b.data as Activity[]};
   },
+  async enrollExisting(scoutId:string,name:string,group:string):Promise<void>{
+    if(!supabase)throw new Error('El registro no está disponible.');
+    const r=await supabase.rpc('chn_register_member',{p_scout_id:scoutId,p_display_name:name,p_group_name:group});
+    if(r.error)throw r.error;
+  },
+  async isSignedIn():Promise<boolean>{
+    if(!supabase)return false;
+    const {data:{user},error}=await supabase.auth.getUser();
+    if(error)throw error;
+    return Boolean(user);
+  },
+  async adminOverview():Promise<{bids:Activity[];entries:Activity[];bidCount:number;entryCount:number}>{
+    if(!supabase)throw new Error('Administración no disponible.');
+    const [b,e,bc,ec]=await Promise.all([
+      supabase.from('chn_bids').select('*').order('created_at',{ascending:false}).limit(1000),
+      supabase.from('chn_raffle_entries').select('*').order('joined_at',{ascending:false}).limit(1000),
+      supabase.from('chn_bids').select('id',{count:'exact',head:true}),
+      supabase.from('chn_raffle_entries').select('id',{count:'exact',head:true})
+    ]);
+    for(const query of [b,e,bc,ec])if(query.error)throw query.error;
+    return {bids:(b.data||[]) as Activity[],entries:(e.data||[]) as Activity[],bidCount:bc.count||0,entryCount:ec.count||0};
+  },
   async members(){if(!supabase)return demoEnabled?[state().user,...sampleOwners].filter(Boolean) as Profile[]:[];
-    const r=await supabase.from('profiles').select('*').order('created_at',{ascending:false}).limit(300);if(r.error)throw r.error;return r.data as Profile[];
+    const r=await supabase.from('chn_profiles').select('*').order('created_at',{ascending:false}).limit(300);if(r.error)throw r.error;return r.data as Profile[];
   },
   async reviewUser(userId:string,verified:boolean){if(!supabase)throw new Error('Administración solo disponible con Supabase.');
-    const r=await supabase.rpc('review_user',{p_user:userId,p_verified:verified});if(r.error)throw r.error;
+    const r=await supabase.rpc('chn_review_user',{p_user:userId,p_verified:verified});if(r.error)throw r.error;
   },
   async reviewListing(listingId:string,action:'active'|'paused'|'cancelled'){
     if(!supabase)throw new Error('Administración solo disponible con Supabase.');
-    const r=await supabase.rpc('review_listing',{p_listing:listingId,p_action:action});if(r.error)throw r.error;
+    const r=await supabase.rpc('chn_review_listing',{p_listing:listingId,p_action:action});if(r.error)throw r.error;
   },
   async finish(listingId:string){if(!supabase)throw new Error('Administración solo disponible con Supabase.');
-    const r=await supabase.rpc('finish_listing',{p_listing:listingId});if(r.error)throw r.error;
+    const r=await supabase.rpc('chn_finish_listing',{p_listing:listingId});if(r.error)throw r.error;
   }
 };

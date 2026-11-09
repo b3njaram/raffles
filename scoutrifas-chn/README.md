@@ -34,13 +34,13 @@ Sin configurar Supabase la app ejecuta **modo demo**, y sus cambios son solo del
 npm run check
 ```
 
-## Conectar Supabase (NO usar la base de datos de Study Compass)
+## Conectar Supabase (Supabase compartido con Study Compass)
 
-1. Crea **un proyecto Supabase nuevo** para ScoutRifas. En SQL Editor ejecuta `supabase/migrations/20261108120000_initial.sql` en ese proyecto vacío. La migración crea tablas, permisos, políticas RLS, dos buckets de Storage (uno privado) y funciones RPC.
+1. Usa el proyecto Supabase existente `ciarlxdhhrsrkpdkyqfi`, con tablas **`public.chn_*`** separadas. La migración correcta es `supabase/migrations/20261108174100_shared_supabase_chn.sql`; **NO ejecutes** la migración antigua de proyecto vacío.n SQL Editor ejecuta `supabase/migrations/20261108120000_initial.sql` en ese proyecto vacío. La migración crea tablas, permisos, políticas RLS, dos buckets de Storage (uno privado) y funciones RPC.
 2. En Auth > Providers > Email, activa confirmación por email y establece la Site URL correcta y las Redirect URLs de tu dominio de Vercel (o `http://localhost:5173` para desarrollo). Configura SMTP de producción para entrega consistente.
-3. En `.env.local` escribe `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY` de ese proyecto (clave **publicable** solamente). No uses `service_role`/secret keys en cliente. `VITE_DEMO_MODE` no afecta la detección de backend: la presencia de las dos variables habilita Supabase.
+3. En Vercel establece `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY` (clave pública). Jamás subir `service_role` al repositorio.nte). No uses `service_role`/secret keys en cliente. `VITE_DEMO_MODE` no afecta la detección de backend: la presencia de las dos variables habilita Supabase.
 4. En producción configura las mismas variables en tu cuenta de Vercel, conecta el proyecto a la subcarpeta del repositorio, y despliega. En Vercel: Framework `Vite`, Build `npm run build`, Output `dist`.
-5. Registra tu ID scout desde la UI. **Eleva al primer administrador manualmente** desde SQL Editor del nuevo proyecto: `UPDATE public.profiles SET role='admin', verified=true WHERE scout_id='CHN-000123';` (sustituye por tu ID real). Nunca pongas esta instrucción dentro del frontend. Verifica la identidad de la persona antes de elevarla.
+5. Registra un usuario con ID scout desde la UI. Para convertirlo en el **primer administrador**, con permisos de propietario desde SQL Editor ejecuta: `UPDATE public.chn_profiles SET role='admin', verified=true WHERE scout_id='CHN-TUIDAQUI'` (reemplaza el ID por el real). Nunca promociones usuarios desde frontend.nistrador manualmente** desde SQL Editor del nuevo proyecto: `UPDATE public.chn_profiles SET role='admin', verified=true WHERE scout_id='CHN-000123';` (sustituye por tu ID real). Nunca pongas esta instrucción dentro del frontend. Verifica la identidad de la persona antes de elevarla.
 6. Los demás usuarios deben registrarse; el admin revisa su identidad por un canal seguro y marca el ID como verificado. Solo pueden participar o publicar tras la aprobación. Los nuevos anuncios también requieren autorización.
 
 ## Seguridad y límites
@@ -75,8 +75,16 @@ Si este proyecto está bajo `scoutrifas-chn/` en un monorepo existente, seleccio
 
 ## Visibilidad del catálogo y comprobación
 
-El catálogo no se carga antes de que `auth.getUser()` y la fila propia de `public.profiles` confirmen la sesión y `verified=true`. La interfaz muestra únicamente una bienvenida genérica para visitantes o miembros pendientes, sin mencionar el requisito técnico del identificador. **La verdadera restricción está en PostgreSQL**: `anon` no tiene `SELECT`, y una sesión no verificada no puede consultar `listings`, otros perfiles ni imágenes privadas. Cambiar el frontend no evade RLS.
+El catálogo no se carga antes de que `auth.getUser()` y la fila propia de `public.chn_profiles` confirmen la sesión y `verified=true`. La interfaz muestra únicamente una bienvenida genérica para visitantes o miembros pendientes, sin mencionar el requisito técnico del identificador. **La verdadera restricción está en PostgreSQL**: `anon` no tiene `SELECT`, y una sesión no verificada no puede consultar `listings`, otros perfiles ni imágenes privadas. Cambiar el frontend no evade RLS.
 
 Las fotos de publicaciones usan `scout-listings` (`public=false`) y URLs firmadas válidas por 10 minutos. Los avatares se guardan en `scout-photos` (`public=true`). Para un sitio de acceso prolongado, añade renovación de URLs antes de su vencimiento.
 
 Para preparar una base totalmente nueva, **no reutilices** `Study Compass 1881`. La creación de un proyecto nuevo requiere seleccionar explícitamente una organización y validar si la creación añade costos. A partir de allí se ejecuta la migración y se configurarán las credenciales públicas.
+
+## Despliegue activo compartido (2026-11-08)
+
+- Proyecto Supabase: `ciarlxdhhrsrkpdkyqfi` (compartido con Study Compass, **tablas independientes**).
+- Tablas `chn_profiles`, `chn_listings`, `chn_raffle_entries`, `chn_bids`, `chn_draw_audit`; funciones `chn_*`; depósitos `chn-avatars` y `chn-listings` (privado).
+- Para que una cuenta existente de Study Compass se una, inicia sesión y completa el registro CHN; requiere revisión administrativa.
+- Panel admin con historial de pujas, participantes, progreso, gestión de miembros y publicaciones.
+- No hay admin predeterminado ni contraseñas de acceso ocultas. El primer admin debe ser autorizado por el propietario del proyecto.
