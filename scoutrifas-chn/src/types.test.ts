@@ -1,26 +1,14 @@
 import {describe,it,expect} from 'vitest';
-import {canViewCatalogue,formatId,isScoutId,minimumBid,remaining} from './types';
+import {canPublish,canRequestTickets,canViewCatalogue,defaultDraft,isScoutId,money,salesReady} from './types';
 import type {Listing,Profile} from './types';
-describe('Validaciones de comunidad',()=>{
-  it('requiere ID empezando con CHN y longitud razonable',()=>{
-    expect(isScoutId(' chn-012345 ')).toBe(true);
-    expect(isScoutId('CHNABCD1')).toBe(true);
-    expect(isScoutId('MX-012345')).toBe(false);
-    expect(isScoutId('CHN-')).toBe(false);
-    expect(isScoutId('CHN-AB!')).toBe(false);
-    expect(formatId(' chn-0123 ')).toBe('CHN-0123');
-  });
-  it('oculta el catálogo a visitantes y registros sin aprobar',()=>{
-    expect(canViewCatalogue(null)).toBe(false);
-    expect(canViewCatalogue({scout_id:'CHN-1234',verified:false} as Profile)).toBe(false);
-    expect(canViewCatalogue({scout_id:'MX-1234',verified:true} as Profile)).toBe(false);
-    expect(canViewCatalogue({scout_id:'CHN-1234',verified:true} as Profile)).toBe(true);
-  });
-  it('escala las pujas con el incremento configurado',()=>{
-    expect(minimumBid({bid_count:0,min_bid:100,current_bid:0,bid_step:20} as Listing)).toBe(100);
-    expect(minimumBid({bid_count:2,min_bid:100,current_bid:300,bid_step:20} as Listing)).toBe(320);
-  });
-  it('muestra la finalización de eventos pasados',()=>{
-    expect(remaining('2000-01-01')).toBe('Finalizó');
-  });
+const scout:Profile={id:'a',scout_id:'CHN-000123',member_type:'scout',adult_attested:true,display_name:'Test Scout',group_name:'',bio:'',avatar_path:null,role:'member',verified:true,created_at:''};
+const supporter:Profile={...scout,member_type:'supporter',scout_id:null,role:'member'};
+const listing:Listing={id:'a',owner_id:'a',title:'Rifa',description:'Descripción',type:'raffle',category:'Otros',image_paths:[],status:'active',end_at:new Date(Date.now()+86400000).toISOString(),min_bid:0,bid_step:1,current_bid:0,entry_count:0,bid_count:0,max_entries:100,max_per_user:5,winner_id:null,created_at:'',ticket_price:50,sales_authorized:false,permit_number:null,permit_expires_at:null,official_rules_url:null,winning_ticket_no:null};
+describe('perfiles y participación',()=>{
+ it('acepta solamente IDs CHN válidos',()=>{expect(isScoutId('CHN-000123')).toBe(true);expect(isScoutId('ABC-000123')).toBe(false)});
+ it('permite simpatizantes aprobados sin ID scout',()=>{expect(canViewCatalogue(supporter)).toBe(true);expect(canPublish(supporter)).toBe(false)});
+ it('rechaza simpatizantes sin aprobación y menores para boletos',()=>{expect(canViewCatalogue({...supporter,verified:false})).toBe(false);expect(canRequestTickets({...scout,adult_attested:false})).toBe(false)});
+ it('solo permite publicar a scouts aprobados',()=>{expect(canPublish(scout)).toBe(true);expect(defaultDraft.ticket_price).toBe(50)});
+ it('sin autorización de venta no hay solicitudes',()=>{expect(salesReady(listing)).toBe(false);expect(salesReady({...listing,sales_authorized:true,permit_number:'SEGOB-2026',permit_expires_at:new Date(Date.now()+86400000).toISOString(),official_rules_url:'https://ejemplo.mx/bases'})).toBe(true)});
+ it('muestra monto MXN',()=>{expect(money(150)).toContain('150')});
 });
