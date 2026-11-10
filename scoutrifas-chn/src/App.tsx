@@ -149,26 +149,20 @@ function PasswordRecovery({onClose,notify}:{onClose:()=>void;notify:(message:str
    </form>
  </div>;
 }
-function ExistingMemberJoin({done,cancel,onSkip,notify}:{done:()=>Promise<void>;cancel:()=>Promise<void>;onSkip:()=>void;notify:(s:string,e?:boolean)=>void}){
- const [kind,setKind]=useState<MemberType>('supporter'),[name,setName]=useState(''),[id,setId]=useState('CHN-'),[group,setGroup]=useState('');
- const [referral,setReferral]=useState(''),[adult,setAdult]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
- const submit=async(e:FormEvent)=>{e.preventDefault();if(busy)return;setBusy(true);setError('');
-  try{await backend.enrollExisting(kind,formatId(id),name.trim(),group.trim(),adult,referral.trim());await done();notify('Perfil guardado. Ya puedes consultar el estado de tu cuenta.')}
-  catch(err){const message=friendlyError(err);setError(message);notify(message,true)}
+function ExistingMemberJoin({done,cancel,onSkip,onApply,notify}:{done:()=>Promise<void>;cancel:()=>Promise<void>;onSkip:()=>void;onApply:()=>void;notify:(s:string,e?:boolean)=>void}){
+ const [busy,setBusy]=useState(false),[error,setError]=useState('');
+ const activate=async()=>{if(busy)return;setBusy(true);setError('');
+  try{await backend.enrollExisting();await done();notify('Tu acceso quedó activado. ¡Bienvenido a ScoutRifas!')}
+  catch(err){const msg=friendlyError(err);setError(msg);notify(msg,true)}
   finally{setBusy(false)}
  };
  return <div className="auth-content">
-  <span className="kicker">COMPLETA TU PERFIL</span><h2>Bienvenido a ScoutRifas</h2>
-  <p className="subtle">Tu cuenta ya está conectada. Completa estos datos una sola vez para solicitar acceso a la comunidad.</p>
-  {error&&<div className="chn-form-error" role="alert"><Flag size={18}/><span>{error}</span></div>}
-  <form className="form-col" onSubmit={submit}><KindPicker kind={kind} setKind={setKind}/>
-   <label>Nombre<input required minLength={2} maxLength={65} value={name} onChange={e=>setName(e.target.value)} autoComplete="name"/></label>
-   {kind==='scout'?<><label>ID scout<input required maxLength={16} value={id} pattern="CHN-?[A-Za-z0-9]{4,12}" onChange={e=>setId(e.target.value.toUpperCase())}/></label><label>Grupo scout<input maxLength={70} value={group} onChange={e=>setGroup(e.target.value)}/></label></>:
-    <label>Referencia o invitación (opcional)<input maxLength={120} value={referral} onChange={e=>setReferral(e.target.value)}/></label>}
-   <label className="chn-check"><input type="checkbox" checked={adult} onChange={e=>setAdult(e.target.checked)}/> Confirmo tener 18 años o más{kind==='scout'?' (para poder solicitar boletos)':''}.</label>
-   <button type="submit" className="primary full" disabled={busy}>{busy?'Guardando…':'Completar registro'}<ArrowRight size={17}/></button>
-  </form>
-  <div className="chn-setup-options"><button type="button" className="secondary" onClick={onSkip}>Ahora no, volver al inicio</button><button type="button" className="text-logout" onClick={()=>{void cancel()}}>Cerrar sesión</button></div>
+  <span className="kicker">ACCESO A TU COMUNIDAD</span><h2>Activa tu acceso aprobado</h2>
+  <p className="subtle">Ya tienes una sesión en Supabase. Para ingresar a ScoutRifas, primero necesitas una solicitud aprobada con el mismo correo que utilizaste al iniciar sesión.</p>
+  {error&&<div className="chn-form-error" role="alert"><Flag size={18}/>{error}</div>}
+  <button type="button" className="primary full" disabled={busy} onClick={()=>{void activate()}}>{busy?'Comprobando…':'Activar acceso aprobado'} <CheckCircle2 size={17}/></button>
+  <button type="button" className="secondary full" onClick={onApply}>No he enviado solicitud · Solicitar acceso</button>
+  <div className="chn-setup-options"><button className="text-logout" type="button" onClick={onSkip}>Volver al inicio</button><button className="text-logout" type="button" onClick={()=>{void cancel()}}>Cerrar sesión</button></div>
  </div>;
 }
 function Detail({item,user,onClose,onLogin,refresh,notify,onProfile}:{item:Listing;user:Profile|null;onClose:()=>void;onLogin:()=>void;refresh:()=>Promise<void>;notify:(s:string,e?:boolean)=>void;onProfile:(p:Profile)=>void}){
@@ -320,10 +314,10 @@ function ProfilePage({person,current,onSave,notify,listings,onOpen}:{person:Prof
  </section>;
 }
 function Admin({items,refresh,notify}:{items:Listing[];refresh:()=>Promise<void>;notify:(s:string,e?:boolean)=>void}){
- const [members,setMembers]=useState<Profile[]>([]),[report,setReport]=useState<AdminReport>(emptyReport),[tab,setTab]=useState<'raffles'|'orders'|'members'|'tickets'>('raffles');
+ const [members,setMembers]=useState<Profile[]>([]),[applications,setApplications]=useState<AccessRequest[]>([]),[report,setReport]=useState<AdminReport>(emptyReport),[tab,setTab]=useState<'applications'|'raffles'|'orders'|'members'|'tickets'>('applications');
  const [busy,setBusy]=useState(''),[search,setSearch]=useState(''),[winning,setWinning]=useState<Record<string,string>>({}),[references,setReferences]=useState<Record<string,string>>({});
  const [updated,setUpdated]=useState<Date|null>(null);
- const reload=useCallback(async()=>{try{const [people,stats]=await Promise.all([backend.members(),backend.adminOverview()]);setMembers(people);setReport(stats);setUpdated(new Date())}
+ const reload=useCallback(async()=>{try{const [people,stats,requests]=await Promise.all([backend.members(),backend.adminOverview(),backend.accessRequests()]);setMembers(people);setReport(stats);setApplications(requests);setUpdated(new Date())}
  catch(err){notify(err instanceof Error?err.message:'Error en administración.',true)}},[notify]);
  useEffect(()=>{void reload();const interval=window.setInterval(()=>{void reload();void refresh().catch(()=>{})},15000);return()=>window.clearInterval(interval)},[reload,refresh]);
  const userNames=new Map(members.map(m=>[m.id,m])),listingNames=new Map(items.map(l=>[l.id,l]));
@@ -332,6 +326,7 @@ function Admin({items,refresh,notify}:{items:Listing[];refresh:()=>Promise<void>
  const handle=async(id:string,task:()=>Promise<unknown>,message:string)=>{setBusy(id);try{await task();await Promise.all([reload(),refresh()]);notify(message)}catch(err){notify(err instanceof Error?err.message:'No se pudo completar.',true)}finally{setBusy('')}};
  const review=(id:string,action:'active'|'paused'|'cancelled')=>void handle(id,()=>backend.reviewListing(id,action),'Publicación actualizada.');
  const verify=(id:string,state:boolean)=>void handle(id,()=>backend.reviewUser(id,state),'Miembro actualizado.');
+ const reviewApplication=(r:AccessRequest,approved:boolean)=>void handle(r.id,()=>backend.reviewAccess(r.id,approved),approved?'Solicitud aprobada. Notifica a la persona para que cree su cuenta.':'Solicitud rechazada.');
  const reviewOrder=(o:TicketOrder,action:'confirmed'|'cancelled')=>{
   if(action==='confirmed'&&!window.confirm('¿Confirmaste documentalmente la operación y verificaste que el sorteo tiene autorización vigente?'))return;
   void handle(o.id,()=>backend.reviewOrder(o.id,action),action==='confirmed'?'Boletos y folios confirmados.':'Solicitud cancelada.');
@@ -361,6 +356,7 @@ function Admin({items,refresh,notify}:{items:Listing[];refresh:()=>Promise<void>
    <div className="stat"><Users/><b>{report.pending}</b><span>Solicitudes pendientes</span></div>
    <div className="stat"><CheckCircle2/><b>{report.totalTickets}</b><span>Folios emitidos</span></div>
    <div className="stat"><Heart/><b>{report.supportersCount}</b><span>Simpatizantes aprobados</span></div>
+   <div className="stat"><Users/><b>{applications.filter(r=>r.status==='pending').length}</b><span>Solicitudes por aprobar</span></div>
    <div className="stat"><BarChart3/><b>{money(totalReference)}</b><span>Valor de boletos confirmados*</span></div>
   </div>
   <div className="admin-toolbar"><small>Actualización cada 15 segundos{updated?' · '+updated.toLocaleTimeString('es-MX'):''}</small><button className="secondary" type="button" onClick={()=>{void reload();void refresh()}}>Actualizar</button></div>
@@ -370,6 +366,7 @@ function Admin({items,refresh,notify}:{items:Listing[];refresh:()=>Promise<void>
    {!items.length&&<p className="empty-small">Todavía no hay rifas creadas.</p>}
   </div>
   <div className="tabs admin-tabs">
+   <button className={tab==='applications'?'active':''} onClick={()=>setTab('applications')}>Accesos ({applications.filter(r=>r.status==='pending').length})</button>
    <button className={tab==='raffles'?'active':''} onClick={()=>setTab('raffles')}>Rifas ({pending} pendientes)</button>
    <button className={tab==='orders'?'active':''} onClick={()=>setTab('orders')}>Solicitudes ({report.pending})</button>
    <button className={tab==='tickets'?'active':''} onClick={()=>setTab('tickets')}>Folios ({report.totalTickets})</button>
@@ -377,6 +374,21 @@ function Admin({items,refresh,notify}:{items:Listing[];refresh:()=>Promise<void>
   </div>
   <div className="admin-filter"><label className="search-field"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por rifa o persona" aria-label="Buscar en administración"/></label>
    {tab==='orders'&&<button className="secondary" disabled={!!busy} onClick={()=>{void csv()}}>{busy==='export'?'Generando…':'Exportar todas las solicitudes (CSV)'}</button>}</div>
+  {tab==='applications'&&<div className="admin-list">{applications.filter(r=>!query||filter(r.display_name,r.email,r.scout_id,r.member_type,r.status)).map(r=><div className="admin-line chn-application-row" key={r.id}>
+   <div className="history-symbol"><Users size={21}/></div>
+   <div className="grow"><b>{r.display_name}</b>
+    <p>{r.email} · {r.member_type==='scout'?'Scout':'Simpatizante'}{r.scout_id?' · '+r.scout_id:''}</p>
+    <small>{r.group_name||r.referral_note||'Sin referencia'} · Solicitud: {new Date(r.created_at).toLocaleDateString('es-MX')}</small>
+    <div className="mini-metrics">{r.status==='pending'?'Pendiente':r.status==='approved'?'Aprobado, falta registro':r.status==='consumed'?'Cuenta registrada':'Rechazado'}</div>
+   </div>
+   <div className="admin-actions">
+    {r.status==='pending'&&<>
+     <button type="button" className="small-approve" disabled={!!busy} onClick={()=>reviewApplication(r,true)}><Check size={15}/> Aprobar</button>
+     <button type="button" className="danger" disabled={!!busy} onClick={()=>reviewApplication(r,false)}>Rechazar</button>
+    </>}
+    {r.status==='approved'&&<a className="chn-email-link" href={'mailto:'+r.email+'?subject='+encodeURIComponent('Tu solicitud a ScoutRifas CHN fue aprobada')+'&body='+encodeURIComponent('Tu solicitud fue aprobada. Entra a https://scoutrifas-chn.vercel.app y selecciona Crear cuenta aprobada, usando el mismo correo. Si ya tenías una cuenta de Supabase, inicia sesión y elige Activar acceso aprobado.')}>Avisar por correo</a>}
+   </div>
+  </div>)}{!applications.length&&<p className="empty-small">Aún no hay solicitudes de acceso. Aparecerán aquí antes de que alguien pueda crear una cuenta ScoutRifas.</p>}</div>}
   {tab==='raffles'&&<div className="admin-list">{items.filter(l=>filter(l.title,l.owner?.display_name,l.status)).map(l=><div className="admin-line" key={l.id}>
    <img src={imageUrl(l.image_paths[0])||sampleHero} alt=""/>
    <div className="grow"><b>{l.title}</b><p>{l.owner?.display_name||'Organizador'} · Precio: {money(l.ticket_price)} · {new Date(l.end_at).toLocaleDateString('es-MX')}</p>
@@ -507,7 +519,7 @@ export default function App(){
    {access&&canPublish(viewer)&&<section className="cta-panel"><div className="cta-ornament"><Fleur size={85}/></div><div><span className="kicker light">TU SIGUIENTE BUENA ACCIÓN</span><h2>¿Tienes un premio para compartir?</h2><p>Prepara una rifa y envíala a revisión. Solo las rifas autorizadas podrán distribuir boletos.</p></div><button onClick={openCreate} className="cta-button">Preparar rifa <ArrowRight size={19}/></button></section>}
    </>:screen==='setup'?<section className="inner-page chn-setup-page">
      <div className="chn-setup-card"><div className="chn-setup-badge"><Fleur size={27}/></div>
-      <ExistingMemberJoin done={refreshUser} cancel={logout} onSkip={()=>{setupDismissed.current=true;setScreen('explore')}} notify={notify}/>
+      <ExistingMemberJoin done={refreshUser} cancel={logout} onSkip={()=>{setupDismissed.current=true;setScreen('explore')}} onApply={openApplication} notify={notify}/>
      </div>
     </section>:screen==='mine'?<section className="inner-page"><div className="section-title"><div><span className="kicker">MIS ACTIVIDADES</span><h2>Mis rifas</h2><p>Publicaciones y estado de cada sorteo que organizas.</p></div><button className="primary" onClick={openCreate}><Plus size={17}/> Nueva rifa</button></div>
     {mine.length?<div className="cards-grid">{mine.map(l=><Card key={l.id} item={l} onOpen={()=>setSelected(l)}/>)}</div>:
