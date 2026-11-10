@@ -49,7 +49,7 @@ function KindPicker({kind,setKind}:{kind:MemberType;setKind:(k:MemberType)=>void
   <button type="button" className={kind==='supporter'?'active':''} onClick={()=>setKind('supporter')}><Heart size={23}/><b>Quiero apoyar</b><small>Amigos y simpatizantes</small></button>
  </div>;
 }
-function Authentication({mode,setMode,onClose,onSuccess,notify}:{mode:AuthMode;setMode:(m:AuthMode)=>void;onClose:()=>void;onSuccess:()=>Promise<void>;notify:(s:string,e?:boolean)=>void}){
+function Authentication({mode,setMode,onClose,onSuccess,notify,onApply}:{mode:AuthMode;setMode:(m:AuthMode)=>void;onClose:()=>void;onSuccess:()=>Promise<void>;notify:(s:string,e?:boolean)=>void;onApply:()=>void}){
  const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[name,setName]=useState('');
  const [id,setId]=useState('CHN-'),[group,setGroup]=useState(''),[referral,setReferral]=useState('');
  const [kind,setKind]=useState<MemberType>('supporter'),[adult,setAdult]=useState(false),[busy,setBusy]=useState(false);
@@ -68,8 +68,8 @@ function Authentication({mode,setMode,onClose,onSuccess,notify}:{mode:AuthMode;s
  };
  return <div className="auth-content">
   <div className="modal-brand"><span className="brand-icon"><Fleur size={25}/></span><span>SCOUT<span className="brand-strong">RIFAS</span> <sup>CHN</sup></span></div>
-  <h2>{mode==='signup'?'Únete a nuestra comunidad':'Bienvenido de vuelta'}</h2>
-  <p className="subtle">{mode==='signup'?'Una forma de apoyar nuevas aventuras.':'Inicia sesión para ver las actividades.'}</p>
+  <h2>{mode==='signup'?'Crear cuenta aprobada':'Bienvenido de vuelta'}</h2>
+  <p className="subtle">{mode==='signup'?'Utiliza el mismo correo y tipo de miembro que autorizó administración.':'Inicia sesión para ver las actividades.'}</p>
   <div className="switcher"><button type="button" className={mode==='login'?'selected':''} onClick={()=>setMode('login')}>Iniciar sesión</button><button type="button" className={mode==='signup'?'selected':''} onClick={()=>setMode('signup')}>Crear cuenta</button></div>
   <form className="form-col" onSubmit={submit}>
    {mode==='signup'&&<><KindPicker kind={kind} setKind={setKind}/>
@@ -88,7 +88,45 @@ function Authentication({mode,setMode,onClose,onSuccess,notify}:{mode:AuthMode;s
     try{setBusy(true);await backend.sendPasswordReset(email);notify('Si el correo está registrado, recibirás un enlace para restablecer tu contraseña.');onClose();}
     catch(err){notify(friendlyError(err),true)}finally{setBusy(false)}
    }}>¿Olvidaste tu contraseña?</button>}
-  <p className="auth-foot">La admisión está sujeta a revisión. No se procesan pagos en este sitio.</p>
+  <p className="auth-foot">La cuenta solo se crea después de la aprobación previa. No se procesan pagos en este sitio.</p>
+  <button className="chn-forgot-button" type="button" onClick={onApply}>Solicitar acceso por primera vez</button>
+ </div>;
+}
+function AccessApplication({onClose,notify,onRegister}:{onClose:()=>void;notify:(s:string,error?:boolean)=>void;onRegister:()=>void}){
+ const [kind,setKind]=useState<MemberType>('supporter'),[name,setName]=useState(''),[email,setEmail]=useState('');
+ const [scoutId,setScoutId]=useState('CHN-'),[group,setGroup]=useState(''),[referral,setReferral]=useState('');
+ const [adult,setAdult]=useState(false),[honeypot,setHoneypot]=useState(''),[busy,setBusy]=useState(false),[sent,setSent]=useState(false),[error,setError]=useState('');
+ const submit=async(e:FormEvent)=>{e.preventDefault();if(busy)return;setBusy(true);setError('');
+  try{
+   await backend.requestAccess({name,email,kind,scoutId:formatId(scoutId),group,referral,adult,website:honeypot});
+   setSent(true);notify('Solicitud recibida. Puedes crear tu cuenta una vez que administración te haya aprobado.');
+  }catch(err){const message=friendlyError(err);setError(message);notify(message,true)}
+  finally{setBusy(false)}
+ };
+ return <div className="auth-content">
+  <div className="modal-brand"><span className="brand-icon"><Fleur size={25}/></span><span>SCOUT<span className="brand-strong">RIFAS</span> <sup>CHN</sup></span></div>
+  {sent?<div className="chn-request-done"><CheckCircle2 size={40}/><h2>¡Solicitud recibida!</h2>
+    <p>La administración revisará tus datos. Cuando recibas la aprobación, podrás crear tu cuenta con este mismo correo o activar una cuenta existente.</p>
+    <button type="button" className="primary full" onClick={onClose}>Entendido <Check size={17}/></button>
+    <button type="button" className="chn-forgot-button" onClick={onRegister}>Ya me aprobaron · Crear cuenta</button>
+   </div>:<>
+   <h2>Solicitar acceso</h2>
+   <p className="subtle">Cuéntanos un poco sobre ti. Enviaremos tu solicitud a revisión antes de habilitar el registro.</p>
+   {error&&<div className="chn-form-error" role="alert"><Flag size={18}/>{error}</div>}
+   <form className="form-col" onSubmit={submit}>
+    <KindPicker kind={kind} setKind={setKind}/>
+    <label>Tu nombre<input required minLength={2} maxLength={65} autoComplete="name" value={name} onChange={e=>setName(e.target.value)}/></label>
+    <label>Correo para el registro<input required type="email" maxLength={254} autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)}/></label>
+    {kind==='scout'?<><label>ID scout<input required maxLength={16} pattern="CHN-?[A-Za-z0-9]{4,12}" value={scoutId} onChange={e=>setScoutId(e.target.value.toUpperCase())}/></label>
+     <label>Grupo y sección<input maxLength={70} value={group} onChange={e=>setGroup(e.target.value)}/></label></>:
+     <label>¿Quién te invitó? (opcional)<input maxLength={120} value={referral} onChange={e=>setReferral(e.target.value)}/></label>}
+    <label className="chn-check"><input type="checkbox" checked={adult} onChange={e=>setAdult(e.target.checked)}/> Confirmo ser mayor de edad{kind==='scout'?' si quiero solicitar boletos':''}.</label>
+    <label className="chn-honeypot" aria-hidden="true">Sitio web<input tabIndex={-1} autoComplete="off" value={honeypot} onChange={e=>setHoneypot(e.target.value)}/></label>
+    <button type="submit" className="primary full" disabled={busy}>{busy?'Enviando…':'Enviar solicitud de acceso'} <ArrowRight size={17}/></button>
+   </form>
+   <p className="auth-foot">El acceso se concede únicamente tras aprobación. No se cobran cuotas ni boletos desde aquí.</p>
+   <button type="button" className="chn-forgot-button" onClick={onRegister}>¿Ya te aprobaron? Crear cuenta</button>
+  </>}
  </div>;
 }
 function PasswordRecovery({onClose,notify}:{onClose:()=>void;notify:(message:string,isError?:boolean)=>void}){
@@ -380,7 +418,7 @@ export default function App(){
  const setupDismissed=useRef(false);
  const [viewer,setViewer]=useState<Profile|null>(null),[needsEnrollment,setNeedsEnrollment]=useState(false),[items,setItems]=useState<Listing[]>([]),[loading,setLoading]=useState(true);
  const [screen,setScreen]=useState<Screen>('explore'),[profileTarget,setProfileTarget]=useState<Profile|null>(null),[selected,setSelected]=useState<Listing|null>(null);
- const [auth,setAuth]=useState<AuthMode|null>(null),[passwordRecovery,setPasswordRecovery]=useState(false),[creating,setCreating]=useState(false),[menu,setMenu]=useState(false),[query,setQuery]=useState(''),[category,setCategory]=useState('Todas'),[sort,setSort]=useState('recent');
+ const [application,setApplication]=useState(false),[auth,setAuth]=useState<AuthMode|null>(null),[passwordRecovery,setPasswordRecovery]=useState(false),[creating,setCreating]=useState(false),[menu,setMenu]=useState(false),[query,setQuery]=useState(''),[category,setCategory]=useState('Todas'),[sort,setSort]=useState('recent');
  const [myOrders,setMyOrders]=useState<TicketOrder[]>([]),[myTickets,setMyTickets]=useState<TicketNumber[]>([]),[toast,setToast]=useState<{text:string;error:boolean}|null>(null);
  const notify=useCallback((text:string,error=false)=>setToast({text,error}),[]);
  useEffect(()=>{if(!toast)return;const id=window.setTimeout(()=>setToast(null),5500);return()=>window.clearTimeout(id)},[toast]);
@@ -417,11 +455,13 @@ export default function App(){
   if(category!=='Todas')list=list.filter(l=>l.category===category);
   return [...list].sort((a,b)=>sort==='ending'?new Date(a.end_at).getTime()-new Date(b.end_at).getTime():sort==='popular'?b.entry_count-a.entry_count:new Date(b.created_at).getTime()-new Date(a.created_at).getTime());
  },[access,items,query,category,sort]);
+ const openApplication=()=>{setAuth(null);setApplication(true)};
+ const openApprovedRegistration=()=>{setApplication(false);setAuth('signup')};
  const show=(screenName:Screen)=>{if(screenName==='setup'&&needsEnrollment){setupDismissed.current=false;setScreen('setup');return;}if(screenName!=='explore'&&!access && !(screenName==='profile'&&viewer)){if(!viewer)setAuth('login');else notify('Tu cuenta está pendiente de activación.',true);return;}
   if(screenName==='admin'&&viewer?.role!=='admin'){notify('Área privada.',true);return;}
   setScreen(screenName);setProfileTarget(null);setMenu(false);window.scrollTo({top:0,behavior:'smooth'});
  };
- const openCreate=()=>{if(!viewer){setAuth('signup');return;}if(!canPublish(viewer)){notify('Tu cuenta no tiene permisos para organizar rifas.',true);return;}setCreating(true)};
+ const openCreate=()=>{if(!viewer){openApplication();return;}if(!canPublish(viewer)){notify('Tu cuenta no tiene permisos para organizar rifas.',true);return;}setCreating(true)};
  const viewProfile=(p:Profile)=>{setProfileTarget(p);setScreen('profile');setSelected(null);window.scrollTo({top:0,behavior:'smooth'})};
  const logout=async()=>{try{await backend.logout();setupDismissed.current=false;setViewer(null);setNeedsEnrollment(false);setItems([]);setSelected(null);setProfileTarget(null);setScreen('explore');notify('Sesión cerrada.')}catch(err){notify(err instanceof Error?err.message:'Error',true)}};
  const mine=access?items.filter(l=>l.owner_id===viewer?.id):[],totalActive=items.filter(isLive).length;
@@ -444,7 +484,7 @@ export default function App(){
     <div className="hero-content"><span className="hero-label"><span className="hero-star">✦</span> PROVINCIA CHIHUAHUA NORTE</span>
      <h1>Compartir también<br/>es una <em>aventura.</em></h1>
      <p>Únete a quienes ayudan a que nuevas aventuras, proyectos y buenas acciones se conviertan en realidad.</p>
-     <div className="hero-actions"><button className="hero-primary" onClick={()=>access?document.getElementById('explorar')?.scrollIntoView({behavior:'smooth'}):needsEnrollment?show('setup'):setAuth('signup')}>
+     <div className="hero-actions"><button className="hero-primary" onClick={()=>access?document.getElementById('explorar')?.scrollIntoView({behavior:'smooth'}):needsEnrollment?show('setup'):openApplication()}>
       {access?'Explorar las rifas':'Quiero apoyar'} <ArrowRight size={18}/></button>
       {access&&canPublish(viewer)&&<button className="hero-secondary" onClick={openCreate}><Plus size={18}/> Organizar una rifa</button>}
      </div></div><div className="hero-stamp"><Fleur size={27}/><span>SIEMPRE<br/>LISTOS</span></div>
@@ -462,7 +502,7 @@ export default function App(){
       <div className="empty"><Compass size={42}/><h3>Sin rifas para mostrar</h3><p>Prueba otra búsqueda o vuelve pronto.</p><button className="secondary" onClick={()=>{setQuery('');setCategory('Todas')}}>Quitar filtros</button></div>}
     </section>:<section className="explore-section private-welcome"><div className="private-welcome-inner"><Compass size={34}/><h2>{viewer?'Bienvenido a la comunidad':'Tu próxima aventura empieza aquí'}</h2>
      <p>{viewer?'Estamos revisando tu solicitud de acceso.':needsEnrollment?'Tienes un registro sin completar. Puedes terminarlo cuando quieras.':cloud?'Inicia sesión o únete para descubrir lo que estamos preparando.':'Este espacio se encuentra en preparación.'}</p>
-     {!viewer&&cloud&&<button className="primary" onClick={()=>needsEnrollment?show('setup'):setAuth('signup')}>{needsEnrollment?'Completar perfil':'Crear cuenta'} <ArrowRight size={17}/></button>}
+     {!viewer&&cloud&&<button className="primary" onClick={()=>needsEnrollment?show('setup'):openApplication()}>{needsEnrollment?'Completar perfil':'Solicitar acceso'} <ArrowRight size={17}/></button>}
     </div></section>}
    {access&&canPublish(viewer)&&<section className="cta-panel"><div className="cta-ornament"><Fleur size={85}/></div><div><span className="kicker light">TU SIGUIENTE BUENA ACCIÓN</span><h2>¿Tienes un premio para compartir?</h2><p>Prepara una rifa y envíala a revisión. Solo las rifas autorizadas podrán distribuir boletos.</p></div><button onClick={openCreate} className="cta-button">Preparar rifa <ArrowRight size={19}/></button></section>}
    </>:screen==='setup'?<section className="inner-page chn-setup-page">
@@ -490,8 +530,9 @@ export default function App(){
    <div className="footer-bottom"><span>© {new Date().getFullYear()} ScoutRifas CHN · Proyecto comunitario</span><span>Sin cobros integrados · No oficial de ASMAC salvo autorización expresa</span></div></footer>
   {toast&&<div className={'toast'+(toast.error?' error':'')} role="status">{toast.error?<Flag size={18}/>:<CheckCircle2 size={18}/>} {toast.text}<button onClick={()=>setToast(null)} aria-label="Cerrar"><X size={16}/></button></div>}
   
+  {application&&<Modal onClose={()=>setApplication(false)}><AccessApplication onClose={()=>setApplication(false)} notify={notify} onRegister={openApprovedRegistration}/></Modal>}
   {passwordRecovery&&<Modal onClose={()=>setPasswordRecovery(false)}><PasswordRecovery onClose={()=>setPasswordRecovery(false)} notify={notify}/></Modal>}
-  {auth&&<Modal onClose={()=>setAuth(null)}><Authentication mode={auth} setMode={setAuth} onClose={()=>setAuth(null)} onSuccess={async()=>{setupDismissed.current=false;await refreshUser()}} notify={notify}/></Modal>}
+  {auth&&<Modal onClose={()=>setAuth(null)}><Authentication mode={auth} setMode={setAuth} onClose={()=>setAuth(null)} onSuccess={async()=>{setupDismissed.current=false;await refreshUser()}} notify={notify} onApply={openApplication}/></Modal>}
   {creating&&viewer&&<Modal width="680px" onClose={()=>setCreating(false)}><CreateListing user={viewer} onClose={()=>setCreating(false)} done={refresh} notify={notify}/></Modal>}
   {selected&&access&&<Modal width="880px" onClose={()=>setSelected(null)}><Detail item={selected} user={viewer} onClose={()=>setSelected(null)} onLogin={()=>setAuth('signup')} refresh={refresh} notify={notify} onProfile={viewProfile}/></Modal>}
  </>;
