@@ -14,7 +14,7 @@ export interface Listing {
  type:ListingType; category:Category; image_paths:string[]; status:ListingStatus;end_at:string;
  min_bid:number;bid_step:number;current_bid:number;entry_count:number;bid_count:number;
  max_entries:number;max_per_user:number;winner_id:string|null;created_at:string;
- ticket_price:number;sales_authorized:boolean;permit_number:string|null;permit_expires_at:string|null;
+ ticket_price:number;sales_authorized:boolean;free_entry_authorized:boolean;free_entry_count:number;permit_number:string|null;permit_expires_at:string|null;
  official_rules_url:string|null;winning_ticket_no:number|null;
 }
 export interface Draft {
@@ -37,6 +37,18 @@ export function calculateRaffle(price:number,count:number,plan:RafflePlan){
  const goalTickets=price>0&&plan.feePct<100?Math.ceil((Math.max(0,plan.prizeCost)+Math.max(0,plan.otherCosts)+Math.max(0,plan.profitGoal))/(price*(1-plan.feePct/100))):Infinity;
  return {revenue,fees,profit,breakEven,goalTickets,margin:revenue>0?100*profit/revenue:0,goalMet:profit>=plan.profitGoal};
 }
+export type SupportPurpose='Actividades'|'Transporte'|'Materiales'|'Formación'|'General';
+export const supportPurposes:SupportPurpose[]=['Actividades','Transporte','Materiales','Formación','General'];
+export interface SupportIntent {
+ id:string;user_id:string;amount:number;purpose:SupportPurpose;note:string;
+ status:'intent';created_at:string;
+}
+export interface FreeDrawEntry {
+ id:string;listing_id:string;user_id:string;entry_no:number;created_at:string;
+}
+export const freeDrawReady=(l:Listing):boolean=>isLive(l)&&l.free_entry_authorized
+ &&Boolean(l.permit_number)&&Boolean(l.official_rules_url)
+ &&Boolean(l.permit_expires_at)&&new Date(l.permit_expires_at||'').getTime()>Date.now();
 export interface TicketOrder {
  id:string;listing_id:string;user_id:string;quantity:number;unit_price:number;total_price:number;
  status:'pending'|'confirmed'|'cancelled'|'expired';expires_at:string;created_at:string;

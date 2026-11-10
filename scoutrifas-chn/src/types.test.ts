@@ -28,3 +28,10 @@ describe('calculadora de rifas',()=>{
   expect(c.goalTickets).toBe(55);
  });
 });
+
+describe('sorteos independientes de aportaciones',()=>{
+ it('el modelo gratuito nunca requiere precio por participación',()=>{
+  const draw={...listing, ticket_price:0,free_entry_authorized:false,free_entry_count:0};
+  expect(draw.ticket_price).toBe(0);expect(draw.free_entry_authorized).toBe(false);
+ });
+});

@@ -1,5 +1,5 @@
 import {createClient} from '@supabase/supabase-js';
-import type {AccessRequest,AdminReport,Draft,Listing,MemberType,Profile,RafflePlan,TicketNumber,TicketOrder} from './types';
+import type {AccessRequest,AdminReport,Category,Draft,FreeDrawEntry,Listing,MemberType,Profile,RafflePlan,SupportIntent,SupportPurpose,TicketNumber,TicketOrder} from './types';
 import {canPublish,canRequestTickets,canViewCatalogue,isScoutId,salesReady} from './types';
 
 const url=import.meta.env.VITE_SUPABASE_URL;
@@ -159,12 +159,37 @@ export const backend={
   if(r.error)throw r.error;
   return String(r.data);
  },
- async requestTickets(l:Listing,user:Profile,quantity:number):Promise<string>{
-  if(!canRequestTickets(user))throw new Error('La cuenta no está habilitada para solicitar boletos.');
-  if(!salesReady(l))throw new Error('Esta rifa todavía no recibe solicitudes.');
-  if(!Number.isInteger(quantity)||quantity<1||quantity>10)throw new Error('Cantidad inválida.');
-  const r=await requireCloud().rpc('chn_request_tickets',{p_listing:l.id,p_quantity:quantity});
-  if(r.error)throw r.error;return String(r.data||'');
+ async createFreeDraw(args:{title:string;description:string;category:Category;endAt:string;capacity:number;images:string[]}):Promise<string>{
+  if(args.images.length<1||args.images.length>10)throw new Error('El sorteo necesita entre 1 y 10 fotos.');
+  const r=await requireCloud().rpc('chn_create_free_draw',{
+   p_title:args.title,p_description:args.description,p_category:args.category,
+   p_end_at:args.endAt,p_capacity:args.capacity,p_images:args.images
+  });
+  if(r.error)throw r.error;return String(r.data);
+ },
+ async joinFreeDraw(listingId:string):Promise<number>{
+  const r=await requireCloud().rpc('chn_join_free_draw',{p_listing:listingId});
+  if(r.error)throw r.error;return Number(r.data);
+ },
+ async recordFreeDraw(listingId:string,entryNo:number,reference:string):Promise<void>{
+  const r=await requireCloud().rpc('chn_record_free_draw',{p_listing:listingId,p_entry_no:entryNo,p_reference:reference});
+  if(r.error)throw r.error;
+ },
+ async freeEntries(userId?:string):Promise<FreeDrawEntry[]>{
+  let query=requireCloud().from('chn_free_draw_entries').select('*').order('created_at',{ascending:false}).limit(1000);
+  if(userId)query=query.eq('user_id',userId);
+  const r=await query;if(r.error)throw r.error;
+  return (r.data||[]) as FreeDrawEntry[];
+ },
+ async supportIntents(userId?:string):Promise<SupportIntent[]>{
+  let query=requireCloud().from('chn_support_pledges').select('*').order('created_at',{ascending:false}).limit(1000);
+  if(userId)query=query.eq('user_id',userId);
+  const r=await query;if(r.error)throw r.error;
+  return (r.data||[]) as SupportIntent[];
+ },
+ async submitSupportIntent(amount:number,purpose:SupportPurpose,note:string):Promise<void>{
+  const r=await requireCloud().rpc('chn_submit_support_intent',{p_amount:amount,p_purpose:purpose,p_note:note});
+  if(r.error)throw r.error;
  },
  async cancelOrder(orderId:string):Promise<void>{
   const r=await requireCloud().rpc('chn_cancel_ticket_order',{p_order:orderId});
