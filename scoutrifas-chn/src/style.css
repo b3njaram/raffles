@@ -159,3 +159,24 @@ main{min-height:65vh}.hero-shell{max-width:1230px;padding:0 20px;margin:22px aut
 .chn-application-row .admin-actions{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
 .chn-create-modal{padding:30px 28px}
 @media(max-width:650px){.chn-upload-previews{grid-template-columns:repeat(3,minmax(0,1fr))}.chn-profit-grid{gap:8px}.chn-profit-grid>div{padding:12px}.chn-profit-planner{padding:15px 12px}.chn-create-modal{padding:24px 18px}.chn-application-row .admin-actions{align-items:stretch}}
+
+
+/* ScoutApoya — apoyo solidario independiente de sorteos gratuitos */
+.chn-support-section{
+ display:flex;align-items:center;gap:28px;max-width:1140px;margin:42px auto 10px;
+ background:linear-gradient(120deg,#f5effa,#fffaf3);border:1px solid #e8deee;border-radius:25px;
+ padding:30px 32px;box-shadow:0 8px 25px rgba(45,28,63,.05);
+}
+.chn-support-deco{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:84px;height:84px;border-radius:25px;background:#e8ddf1;color:#67488f}
+.chn-support-section>div:nth-child(2){flex:1;min-width:0}
+.chn-support-section h2{font-size:clamp(1.45rem,3vw,2.25rem);letter-spacing:-.04em;margin:5px 0 10px;color:#342547}
+.chn-support-section p{font-size:.95rem;line-height:1.65;color:#61536b;margin:0 0 8px}
+.chn-support-section .chn-independence{font-size:.82rem;font-weight:650;color:#695079}
+.chn-support-section .primary{flex-shrink:0}
+.chn-donation-amounts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:8px 0 18px}
+.chn-donation-amounts button{border:1px solid #d9cbe2;border-radius:12px;background:#fff;color:#63477c;padding:11px 4px;font-weight:750;cursor:pointer}
+.chn-donation-amounts button:hover,.chn-donation-amounts button.selected{background:#6b4588;border-color:#6b4588;color:white}
+.chn-support-section .primary,.chn-donation-amounts button{transition:background .15s,border-color .15s}
+.chm-minor{color:#756784;font-size:.85rem}
+@media(max-width:900px){.chn-support-section{margin:25px 20px;flex-wrap:wrap}.chn-support-section .primary{margin-left:0}}
+@media(max-width:580px){.chn-support-section{margin:20px 12px;gap:15px;padding:22px 17px}.chn-support-deco{width:56px;height:56px;border-radius:16px}.chn-support-deco svg{height:30px;width:30px}.chn-support-section>div:nth-child(2){flex-basis:calc(100% - 73px)}.chn-support-section .primary{width:100%}.chn-donation-amounts{grid-template-columns:repeat(2,minmax(0,1fr))}}
