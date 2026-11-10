@@ -10,7 +10,6 @@ type Screen='explore'|'setup'|'mine'|'activity'|'profile'|'admin';
 type AuthMode='login'|'signup';
 const sampleHero='https://images.unsplash.com/photo-1500534623283-312aade485b7?w=1600&q=80';
 const categoryIcons:Record<Category,string>={Aventura:'⛺',Equipo:'🎒',Coleccionables:'🏅',Experiencias:'🏕️',Arte:'🎨',Otros:'✨'};
-const emptyReport:AdminReport={orders:[],tickets:[],confirmed:0,pending:0,totalTickets:0,totalOrders:0,totalReference:0,memberCount:0,pendingMembers:0,supportersCount:0};
 function Fleur({size=30}:{size?:number}){return <span className="fleur" style={{fontSize:size}} aria-hidden="true">⚜</span>}
 function Avatar({user,size=38}:{user?:Profile|null;size?:number}){
  const src=imageUrl(user?.avatar_path),letters=(user?.display_name||'?').split(' ').slice(0,2).map(x=>x[0]).join('').toUpperCase();
@@ -382,122 +381,173 @@ export default function App(){
  const setupDismissed=useRef(false);
  const [viewer,setViewer]=useState<Profile|null>(null),[needsEnrollment,setNeedsEnrollment]=useState(false),[items,setItems]=useState<Listing[]>([]),[loading,setLoading]=useState(true);
  const [screen,setScreen]=useState<Screen>('explore'),[profileTarget,setProfileTarget]=useState<Profile|null>(null),[selected,setSelected]=useState<Listing|null>(null);
- const [application,setApplication]=useState(false),[auth,setAuth]=useState<AuthMode|null>(null),[passwordRecovery,setPasswordRecovery]=useState(false),[creating,setCreating]=useState(false),[menu,setMenu]=useState(false),[query,setQuery]=useState(''),[category,setCategory]=useState('Todas'),[sort,setSort]=useState('recent');
- const [myOrders,setMyOrders]=useState<TicketOrder[]>([]),[myTickets,setMyTickets]=useState<TicketNumber[]>([]),[toast,setToast]=useState<{text:string;error:boolean}|null>(null);
+ const [application,setApplication]=useState(false),[auth,setAuth]=useState<AuthMode|null>(null),[passwordRecovery,setPasswordRecovery]=useState(false),[creating,setCreating]=useState(false),[supportModal,setSupportModal]=useState(false);
+ const [menu,setMenu]=useState(false),[query,setQuery]=useState(''),[category,setCategory]=useState('Todas'),[sort,setSort]=useState('recent');
+ const [myEntries,setMyEntries]=useState<FreeDrawEntry[]>([]),[mySupport,setMySupport]=useState<SupportIntent[]>([]);
+ const [toast,setToast]=useState<{text:string;error:boolean}|null>(null);
  const notify=useCallback((text:string,error=false)=>setToast({text,error}),[]);
  useEffect(()=>{if(!toast)return;const id=window.setTimeout(()=>setToast(null),5500);return()=>window.clearTimeout(id)},[toast]);
  const refresh=useCallback(async()=>{const list=await backend.list();setItems(list);setSelected(current=>current?list.find(l=>l.id===current.id)||null:null)},[]);
  const refreshUser=useCallback(async()=>{
   const person=await backend.session();
-  const hasAccountWithoutProfile=!person&&cloud?await backend.isSignedIn():false;
-  setViewer(person);
-  setNeedsEnrollment(hasAccountWithoutProfile);
-  if(hasAccountWithoutProfile){
-   setItems([]);setSelected(null);setMyOrders([]);setMyTickets([]);
+  const noProfile=!person&&cloud?await backend.isSignedIn():false;
+  setViewer(person);setNeedsEnrollment(noProfile);
+  if(noProfile){
+   setItems([]);setSelected(null);setMyEntries([]);setMySupport([]);
    if(!setupDismissed.current)setScreen(current=>current==='setup'?current:'setup');
   }else if(canViewCatalogue(person)){
    setItems(await backend.list());
    if(person?.role==='admin')setScreen(current=>current==='explore'||current==='setup'?'admin':current);
    else setScreen(current=>current==='setup'?'explore':current);
   }else{
-   setItems([]);setSelected(null);setMyOrders([]);setMyTickets([]);
+   setItems([]);setSelected(null);setMyEntries([]);setMySupport([]);
    setScreen(current=>current==='setup'?'explore':current);
   }
  },[]);
- useEffect(()=>{let active=true;
-  void refreshUser().catch(err=>notify(err instanceof Error?err.message:'Error al cargar sesión.',true)).finally(()=>{if(active)setLoading(false)});
-  const observer=supabase?.auth.onAuthStateChange((event)=>{if(event==='PASSWORD_RECOVERY'){setAuth(null);setPasswordRecovery(true)}window.setTimeout(()=>{if(active)void refreshUser().catch(()=>{})},0)});
-  return()=>{active=false;observer?.data.subscription.unsubscribe()};
+ useEffect(()=>{
+  let active=true;
+  void refreshUser().catch(err=>notify(friendlyError(err),true)).finally(()=>{if(active)setLoading(false)});
+  const subscription=supabase?.auth.onAuthStateChange(event=>{
+   if(event==='PASSWORD_RECOVERY'){setAuth(null);setPasswordRecovery(true)}
+   window.setTimeout(()=>{if(active)void refreshUser().catch(()=>{})},0)
+  });
+  return()=>{active=false;subscription?.data.subscription.unsubscribe()}
  },[refreshUser,notify]);
- useEffect(()=>{if(!canViewCatalogue(viewer))return;const interval=window.setInterval(()=>void refresh().catch(()=>{}),15000);return()=>window.clearInterval(interval)},[viewer?.id,viewer?.verified,refresh]);
- useEffect(()=>{if(screen!=='activity'||!viewer)return;void Promise.all([backend.orders(viewer.id),backend.tickets(viewer.id)]).then(([o,t])=>{setMyOrders(o);setMyTickets(t)}).catch(err=>notify(err instanceof Error?err.message:'Error al cargar tus boletos.',true))},[screen,viewer,items,notify]);
+ useEffect(()=>{if(!canViewCatalogue(viewer))return;const t=window.setInterval(()=>void refresh().catch(()=>{}),15000);return()=>window.clearInterval(t)},[viewer?.id,viewer?.verified,refresh]);
+ useEffect(()=>{if(screen!=='activity'||!viewer)return;
+  let active=true;void Promise.all([backend.freeEntries(viewer.id),backend.supportIntents(viewer.id)])
+   .then(([entries,support])=>{if(active){setMyEntries(entries);setMySupport(support)}}).catch(err=>notify(friendlyError(err),true));
+  return()=>{active=false}
+ },[screen,viewer?.id,items,notify]);
  const access=canViewCatalogue(viewer);
- const results=useMemo(()=>{if(!access)return[];
+ const results=useMemo(()=>{
+  if(!access)return [];
   const text=query.trim().toLowerCase();
   let list=items.filter(l=>l.type==='raffle'&&(l.status==='active'||l.status==='finished'));
   if(text)list=list.filter(l=>(l.title+' '+l.description+' '+l.category+' '+(l.owner?.display_name||'')).toLowerCase().includes(text));
   if(category!=='Todas')list=list.filter(l=>l.category===category);
-  return [...list].sort((a,b)=>sort==='ending'?new Date(a.end_at).getTime()-new Date(b.end_at).getTime():sort==='popular'?b.entry_count-a.entry_count:new Date(b.created_at).getTime()-new Date(a.created_at).getTime());
+  return [...list].sort((a,b)=>sort==='ending'?new Date(a.end_at).getTime()-new Date(b.end_at).getTime():sort==='popular'?b.free_entry_count-a.free_entry_count:new Date(b.created_at).getTime()-new Date(a.created_at).getTime());
  },[access,items,query,category,sort]);
  const openApplication=()=>{setAuth(null);setApplication(true)};
  const openApprovedRegistration=()=>{setApplication(false);setAuth('signup')};
- const show=(screenName:Screen)=>{if(screenName==='setup'&&needsEnrollment){setupDismissed.current=false;setScreen('setup');return;}if(screenName!=='explore'&&!access && !(screenName==='profile'&&viewer)){if(!viewer)setAuth('login');else notify('Tu cuenta está pendiente de activación.',true);return;}
-  if(screenName==='admin'&&viewer?.role!=='admin'){notify('Área privada.',true);return;}
-  setScreen(screenName);setProfileTarget(null);setMenu(false);window.scrollTo({top:0,behavior:'smooth'});
+ const show=(target:Screen)=>{
+  if(target==='setup'&&needsEnrollment){setupDismissed.current=false;setScreen('setup');return;}
+  if(target!=='explore'&&!access){if(!viewer)setAuth('login');else notify('Tu cuenta está pendiente de aprobación.',true);return}
+  if(target==='admin'&&viewer?.role!=='admin'){notify('Área privada.',true);return}
+  setScreen(target);setProfileTarget(null);setMenu(false);window.scrollTo({top:0,behavior:'smooth'});
  };
- const openCreate=()=>{if(!viewer){openApplication();return;}if(!canPublish(viewer)){notify('Tu cuenta no tiene permisos para organizar rifas.',true);return;}setCreating(true)};
- const viewProfile=(p:Profile)=>{setProfileTarget(p);setScreen('profile');setSelected(null);window.scrollTo({top:0,behavior:'smooth'})};
- const logout=async()=>{try{await backend.logout();setupDismissed.current=false;setViewer(null);setNeedsEnrollment(false);setItems([]);setSelected(null);setProfileTarget(null);setScreen('explore');notify('Sesión cerrada.')}catch(err){notify(err instanceof Error?err.message:'Error',true)}};
- const mine=access?items.filter(l=>l.owner_id===viewer?.id):[],totalActive=items.filter(isLive).length;
+ const support=()=>{
+  if(!access){if(needsEnrollment)show('setup');else if(!viewer)openApplication();else notify('Necesitas una cuenta aprobada.',true);return;}
+  setSupportModal(true);setMenu(false);
+ };
+ const openCreate=()=>{
+  if(!viewer){openApplication();return}
+  if(!canPublish(viewer)){notify('Esta cuenta no puede organizar sorteos.',true);return}
+  setCreating(true)
+ };
+ const viewProfile=(profile:Profile)=>{setProfileTarget(profile);setScreen('profile');setSelected(null);window.scrollTo({top:0,behavior:'smooth'})};
+ const logout=async()=>{try{await backend.logout();setupDismissed.current=false;setViewer(null);setNeedsEnrollment(false);setItems([]);setSelected(null);setMyEntries([]);setMySupport([]);setScreen('explore');notify('Sesión cerrada.')}catch(err){notify(friendlyError(err),true)}};
+ const mine=access?items.filter(l=>l.owner_id===viewer?.id):[];
+ const live=items.filter(isLive).length;
  return <>
   <header className="site-header"><div className="nav-container">
-   <button className="logo" onClick={()=>show('explore')} aria-label="ScoutRifas inicio"><span className="logo-mark"><Fleur size={29}/></span><span className="logo-name">SCOUT<span>RIFAS</span><small>CHIHUAHUA NORTE</small></span></button>
+   <button className="logo" onClick={()=>show('explore')} aria-label="ScoutApoya inicio"><span className="logo-mark"><Fleur size={29}/></span><span className="logo-name">SCOUT<span>APOYA</span><small>CHIHUAHUA NORTE</small></span></button>
    <nav className={menu?'nav-links open':'nav-links'}>
-    <button className={screen==='explore'?'nav-active':''} onClick={()=>show('explore')}>Explorar</button>
-    {access&&canPublish(viewer)&&<button className={screen==='mine'?'nav-active':''} onClick={()=>show('mine')}>Mis rifas</button>}
-    {access&&<button className={screen==='activity'?'nav-active':''} onClick={()=>show('activity')}>Mis boletos</button>}
+    <button className={screen==='explore'?'nav-active':''} onClick={()=>show('explore')}>Inicio y sorteos</button>
+    <button onClick={support}>Apoyar proyectos</button>
+    {access&&canPublish(viewer)&&<button className={screen==='mine'?'nav-active':''} onClick={()=>show('mine')}>Mis sorteos</button>}
+    {access&&<button className={screen==='activity'?'nav-active':''} onClick={()=>show('activity')}>Mi actividad</button>}
     {access&&viewer?.role==='admin'&&<button className={screen==='admin'?'nav-active':''} onClick={()=>show('admin')}>Administración</button>}
    </nav>
-   <div className="nav-right">{canPublish(viewer)&&<button className="create-nav" onClick={openCreate}><Plus size={18}/> Crear rifa</button>}
+   <div className="nav-right">
+    {canPublish(viewer)&&<button className="create-nav" onClick={openCreate}><Plus size={18}/> Crear sorteo</button>}
     {viewer?<button className="account" onClick={()=>viewProfile(viewer)}><Avatar user={viewer} size={34}/><span>{viewer.display_name.split(' ')[0]}</span><ChevronDown size={15}/></button>:
-     needsEnrollment?<button className="sign-in" onClick={()=>show('setup')}><CheckCircle2 size={17}/> Completar perfil</button>:cloud?<button className="sign-in" onClick={()=>setAuth('login')}><LogIn size={17}/> Iniciar sesión</button>:null}
+     needsEnrollment?<button className="sign-in" onClick={()=>show('setup')}>Activar cuenta</button>:
+     cloud?<button className="sign-in" onClick={()=>setAuth('login')}><LogIn size={17}/> Iniciar sesión</button>:null}
     <button className="menu-button" onClick={()=>setMenu(!menu)} aria-label="Abrir menú"><Menu size={24}/></button>
    </div></div></header>
   <main>{screen==='explore'?<>
-   <div className="hero-shell"><section className="hero"><div className="hero-photo" style={{backgroundImage:"linear-gradient(90deg, rgba(33,23,44,.91) 0%, rgba(33,23,44,.65) 49%, rgba(33,23,44,.2) 100%),url('"+sampleHero+"')"}}/>
-    <div className="hero-content"><span className="hero-label"><span className="hero-star">✦</span> PROVINCIA CHIHUAHUA NORTE</span>
-     <h1>Compartir también<br/>es una <em>aventura.</em></h1>
-     <p>Únete a quienes ayudan a que nuevas aventuras, proyectos y buenas acciones se conviertan en realidad.</p>
-     <div className="hero-actions"><button className="hero-primary" onClick={()=>access?document.getElementById('explorar')?.scrollIntoView({behavior:'smooth'}):needsEnrollment?show('setup'):openApplication()}>
-      {access?'Explorar las rifas':'Quiero apoyar'} <ArrowRight size={18}/></button>
-      {access&&canPublish(viewer)&&<button className="hero-secondary" onClick={openCreate}><Plus size={18}/> Organizar una rifa</button>}
+   <div className="hero-shell"><section className="hero"><div className="hero-photo" style={{backgroundImage:"linear-gradient(90deg,rgba(33,23,44,.93),rgba(33,23,44,.42)),url('"+sampleHero+"')"}}/>
+    <div className="hero-content"><span className="hero-label">⚜ COMUNIDAD SCOUT · CHIHUAHUA NORTE</span>
+     <h1>Una buena acción<br/>puede cambiar <em>vidas.</em></h1>
+     <p>Apoya proyectos de nuestra comunidad. También puedes explorar sorteos gratuitos e independientes: <b>no necesitas donar para participar.</b></p>
+     <div className="hero-actions"><button className="hero-primary" onClick={support}><Heart size={18}/> Quiero apoyar</button>
+      <button className="hero-secondary" onClick={()=>access?document.getElementById('explorar')?.scrollIntoView({behavior:'smooth'}):needsEnrollment?show('setup'):openApplication()}>Explorar sorteos <ArrowRight size={18}/></button>
      </div></div><div className="hero-stamp"><Fleur size={27}/><span>SIEMPRE<br/>LISTOS</span></div>
    </section></div>
-   <section className="intro-strip"><div><div className="strip-icon"><Compass size={24}/></div><div><b>Comunidad primero</b><span>Cada buena acción cuenta</span></div></div>
-    <div><div className="strip-icon"><ShieldCheck size={24}/></div><div><b>Organización transparente</b><span>Solicitudes y folios verificables</span></div></div>
-    <div><div className="strip-icon"><Heart size={24}/></div><div><b>Todos pueden apoyar</b><span>Exploradores y amigos</span></div></div></section>
-   {access?<section className="explore-section" id="explorar"><div className="section-title"><div><span className="kicker">EXPLORA Y APOYA</span><h2>Próximas rifas <span>✦</span></h2><p>Premios y experiencias preparados por nuestra comunidad.</p></div><div className="headline-stat"><b>{totalActive}</b><span>rifas activas</span></div></div>
-     <div className="filter-wrap"><div className="category-tabs"><button className="active"><Ticket size={16}/> Rifas por boletos</button></div>
-      <div className="filter-controls"><label className="search-field"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar premios y experiencias…" aria-label="Buscar rifas"/></label>
-       <select aria-label="Filtrar categoría" value={category} onChange={e=>setCategory(e.target.value)}><option>Todas</option>{categories.map(c=><option key={c}>{c}</option>)}</select>
-       <select aria-label="Ordenar resultados" value={sort} onChange={e=>setSort(e.target.value)}><option value="recent">Más recientes</option><option value="ending">Próximas a cerrar</option><option value="popular">Más participantes</option></select>
-      </div></div>
-     {loading?<div className="empty"><Compass className="spin" size={38}/> Cargando rifas…</div>:results.length?<div className="cards-grid">{results.map(l=><Card key={l.id} item={l} onOpen={()=>setSelected(l)}/>)}</div>:
-      <div className="empty"><Compass size={42}/><h3>Sin rifas para mostrar</h3><p>Prueba otra búsqueda o vuelve pronto.</p><button className="secondary" onClick={()=>{setQuery('');setCategory('Todas')}}>Quitar filtros</button></div>}
-    </section>:<section className="explore-section private-welcome"><div className="private-welcome-inner"><Compass size={34}/><h2>{viewer?'Bienvenido a la comunidad':'Tu próxima aventura empieza aquí'}</h2>
-     <p>{viewer?'Estamos revisando tu solicitud de acceso.':needsEnrollment?'Tienes un registro sin completar. Puedes terminarlo cuando quieras.':cloud?'Inicia sesión o únete para descubrir lo que estamos preparando.':'Este espacio se encuentra en preparación.'}</p>
-     {!viewer&&cloud&&<button className="primary" onClick={()=>needsEnrollment?show('setup'):openApplication()}>{needsEnrollment?'Completar perfil':'Solicitar acceso'} <ArrowRight size={17}/></button>}
-    </div></section>}
-   {access&&canPublish(viewer)&&<section className="cta-panel"><div className="cta-ornament"><Fleur size={85}/></div><div><span className="kicker light">TU SIGUIENTE BUENA ACCIÓN</span><h2>¿Tienes un premio para compartir?</h2><p>Prepara una rifa y envíala a revisión. Solo las rifas autorizadas podrán distribuir boletos.</p></div><button onClick={openCreate} className="cta-button">Preparar rifa <ArrowRight size={19}/></button></section>}
-   </>:screen==='setup'?<section className="inner-page chn-setup-page">
-     <div className="chn-setup-card"><div className="chn-setup-badge"><Fleur size={27}/></div>
-      <ExistingMemberJoin done={refreshUser} cancel={logout} onSkip={()=>{setupDismissed.current=true;setScreen('explore')}} onApply={openApplication} notify={notify}/>
-     </div>
-    </section>:screen==='mine'?<section className="inner-page"><div className="section-title"><div><span className="kicker">MIS ACTIVIDADES</span><h2>Mis rifas</h2><p>Publicaciones y estado de cada sorteo que organizas.</p></div><button className="primary" onClick={openCreate}><Plus size={17}/> Nueva rifa</button></div>
-    {mine.length?<div className="cards-grid">{mine.map(l=><Card key={l.id} item={l} onOpen={()=>setSelected(l)}/>)}</div>:
-     <div className="empty"><Ticket size={38}/><h3>Aún no organizas rifas</h3><button className="primary" onClick={openCreate}>Preparar mi primera rifa</button></div>}
-   </section>:screen==='activity'?<section className="inner-page"><div className="section-title"><div><span className="kicker">MIS PARTICIPACIONES</span><h2>Mis boletos</h2><p>Solicitudes, confirmaciones y folios asignados.</p></div><Ticket size={40} className="page-icon"/></div>
-     <div className="activity-grid"><div className="activity-block"><h3><Clock3 size={20}/> Mis solicitudes <span>{myOrders.length}</span></h3>
-      {myOrders.length?myOrders.map(o=>{const l=items.find(x=>x.id===o.listing_id);return <button key={o.id} className="activity-row" onClick={()=>{if(l)setSelected(l)}}>
-       <b>{l?.title||'Rifa'}</b><small>{o.quantity} × {money(o.unit_price)} · {o.status==='pending'&&new Date(o.expires_at)<new Date()?'Caducó':o.status==='confirmed'?'Confirmada':o.status==='cancelled'?'Cancelada':'En revisión'}</small><ArrowRight size={16}/></button>}):<p className="empty-small">Todavía no has solicitado boletos.</p>}
-     </div><div className="activity-block"><h3><Ticket size={20}/> Mis folios <span>{myTickets.length}</span></h3>
-      {myTickets.length?myTickets.map(t=>{const l=items.find(x=>x.id===t.listing_id);return <button key={t.id} className="activity-row" onClick={()=>{if(l)setSelected(l)}}>
-       <b>{l?.title||'Rifa'}</b><small>Folio #{String(t.ticket_no).padStart(4,'0')}</small><ArrowRight size={16}/></button>}):<p className="empty-small">Los folios aparecerán después de la confirmación autorizada.</p>}
+   <section className="intro-strip">
+    <div><div className="strip-icon"><Heart size={24}/></div><div><b>Apoyos voluntarios</b><span>Para actividades y proyectos</span></div></div>
+    <div><div className="strip-icon"><ShieldCheck size={24}/></div><div><b>Participación independiente</b><span>Donar no cambia tus oportunidades</span></div></div>
+    <div><div className="strip-icon"><Compass size={24}/></div><div><b>Comunidad verificada</b><span>Acceso aprobado por administración</span></div></div>
+   </section>
+   <section className="chn-support-section">
+    <div className="chn-support-deco"><Heart size={48}/></div>
+    <div><span className="kicker">TU APOYO DEJA HUELLA</span><h2>Impulsa nuevas aventuras</h2>
+     <p>Materiales, transporte, formación y actividades para la comunidad. Elige qué causa quieres apoyar sin asumir obligaciones de compra.</p>
+     <p className="chn-independence">Las donaciones nunca compran boletos ni generan oportunidades de ganar. Esta página no procesa pagos.</p></div>
+    <button className="primary" onClick={support}>Quiero apoyar <Heart size={18}/></button>
+   </section>
+   {access?<section className="explore-section" id="explorar">
+    <div className="section-title"><div><span className="kicker">ACTIVIDADES DE LA COMUNIDAD</span><h2>Sorteos gratuitos <span>✦</span></h2>
+     <p>Elige el sorteo que te interese. Participar es independiente de cualquier aporte y solo se habilita con autorización correspondiente.</p>
+    </div><div className="headline-stat"><b>{live}</b><span>sorteos publicados</span></div></div>
+    <div className="filter-wrap"><div className="category-tabs"><button className="active"><Ticket size={16}/> Sin compra obligatoria</button></div>
+     <div className="filter-controls"><label className="search-field"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar premios o experiencias" aria-label="Buscar sorteos"/></label>
+      <select aria-label="Filtrar categoría" value={category} onChange={e=>setCategory(e.target.value)}><option>Todas</option>{categories.map(c=><option key={c}>{c}</option>)}</select>
+      <select aria-label="Ordenar" value={sort} onChange={e=>setSort(e.target.value)}><option value="recent">Más recientes</option><option value="ending">Cierre próximo</option><option value="popular">Más participaciones</option></select>
      </div></div>
-   </section>:screen==='profile'?(profileTarget||viewer)&&<div className="inner-page profile-container"><button className="back-link" onClick={()=>show('explore')}><ArrowLeft size={17}/> Volver a explorar</button>
-    <ProfilePage person={viewer&&profileTarget?.id===viewer.id?viewer:(profileTarget||viewer)!} current={viewer?.id===(profileTarget||viewer)?.id} onSave={refreshUser} notify={notify}
-     listings={items.filter(l=>l.owner_id===(profileTarget||viewer)?.id&&(l.status==='active'||l.status==='finished'||viewer?.id===l.owner_id))} onOpen={setSelected}/>
-    {viewer?.id===(profileTarget||viewer)?.id&&<button className="text-logout" onClick={()=>{void logout()}}><LogOut size={16}/> Cerrar sesión</button>}
-   </div>:screen==='admin'&&viewer?.role==='admin'?<div className="inner-page"><Admin items={items} refresh={refresh} notify={notify}/></div>:null}
-  </main>
-  <footer className="footer"><div className="footer-top"><div className="footer-brand"><div className="logo-mark"><Fleur size={27}/></div><div><b>SCOUTRIFAS <span>CHN</span></b><p>La comunidad que comparte y crece.</p></div></div><div className="footer-links"><button onClick={()=>show('explore')}>Inicio</button>{access&&<button onClick={()=>show('activity')}>Mis boletos</button>}{canPublish(viewer)&&<button onClick={openCreate}>Crear rifa</button>}</div></div>
-   <div className="footer-bottom"><span>© {new Date().getFullYear()} ScoutRifas CHN · Proyecto comunitario</span><span>Sin cobros integrados · No oficial de ASMAC salvo autorización expresa</span></div></footer>
+    {loading?<div className="empty"><Compass size={40}/> Cargando…</div>:results.length?<div className="cards-grid">{results.map(l=><Card key={l.id} item={l} onOpen={()=>setSelected(l)}/>)}</div>:
+     <div className="empty"><Compass size={42}/><h3>Aún no hay sorteos disponibles</h3><p>Estamos preparando las actividades y su documentación.</p></div>}
+   </section>:<section className="explore-section private-welcome"><div className="private-welcome-inner"><Compass size={35}/>
+    <h2>Únete a nuestra comunidad</h2><p>{needsEnrollment?'Tu cuenta está pendiente de completar su acceso.':viewer?'Tu cuenta se encuentra en revisión.':'Solicita acceso para conocer los sorteos y apoyar a nuestros proyectos.'}</p>
+    <button className="primary" onClick={()=>needsEnrollment?show('setup'):viewer?setAuth('login'):openApplication()}>{needsEnrollment?'Activar cuenta':'Solicitar acceso'} <ArrowRight size={17}/></button>
+   </div></section>}
+   {access&&canPublish(viewer)&&<section className="cta-panel"><div className="cta-ornament"><Fleur size={85}/></div>
+    <div><span className="kicker light">ORGANIZA TU ACTIVIDAD</span><h2>¿Tienes una experiencia para compartir?</h2>
+     <p>Crea un sorteo gratuito, agrega hasta 10 fotos y envíalo a revisión. El acceso se abrirá únicamente con permiso aplicable.</p></div>
+    <button onClick={openCreate} className="cta-button">Preparar sorteo <ArrowRight size={18}/></button>
+   </section>}
+  </>:screen==='setup'?<section className="inner-page chn-setup-page"><div className="chn-setup-card">
+   <div className="chn-setup-badge"><Fleur size={27}/></div><ExistingMemberJoin done={refreshUser} cancel={logout} onSkip={()=>{setupDismissed.current=true;setScreen('explore')}} onApply={openApplication} notify={notify}/></div></section>:
+  screen==='mine'?<section className="inner-page">
+   <div className="section-title"><div><span className="kicker">MIS ACTIVIDADES</span><h2>Mis sorteos gratuitos</h2><p>Revisa las publicaciones que has organizado.</p></div>
+    <button className="primary" onClick={openCreate}><Plus size={17}/> Nuevo sorteo</button></div>
+   {mine.length?<div className="cards-grid">{mine.map(l=><Card key={l.id} item={l} onOpen={()=>setSelected(l)}/>)}</div>:
+    <div className="empty"><Ticket size={38}/><h3>Aún no organizas sorteos</h3><button className="primary" onClick={openCreate}>Crear uno</button></div>}
+  </section>:
+  screen==='activity'?<section className="inner-page">
+   <div className="section-title"><div><span className="kicker">TU PARTICIPACIÓN</span><h2>Mis apoyos y sorteos</h2><p>Los apoyos y las participaciones se registran por separado.</p></div><Heart size={40} className="page-icon"/></div>
+   <div className="activity-grid">
+    <div className="activity-block"><h3><Heart size={20}/> Intenciones de apoyo <span>{mySupport.length}</span></h3>
+     {mySupport.length?mySupport.map(p=><div className="activity-row" key={p.id}><b>{p.purpose} · {money(p.amount)}</b><small>Solo intención de apoyo · No cobrada · {new Date(p.created_at).toLocaleDateString('es-MX')}</small></div>):
+      <p className="empty-small">Aún no registras apoyos. Este sitio no realiza cobros.</p>}
+     <button className="secondary" onClick={support}>Quiero apoyar</button>
+    </div>
+    <div className="activity-block"><h3><Ticket size={20}/> Participaciones gratuitas <span>{myEntries.length}</span></h3>
+     {myEntries.length?myEntries.map(e=>{const draw=items.find(x=>x.id===e.listing_id);return <button className="activity-row" key={e.id} onClick={()=>{if(draw)setSelected(draw)}}>
+      <b>{draw?.title||'Sorteo'}</b><small>Participación #{String(e.entry_no).padStart(4,'0')} · Sin donación obligatoria</small><ArrowRight size={16}/></button>}):
+      <p className="empty-small">Aún no participas en sorteos. Cuando haya uno autorizado podrás registrarte gratis.</p>}
+    </div>
+   </div>
+  </section>:
+  screen==='profile'&&(profileTarget||viewer)?<div className="inner-page profile-container">
+   <button className="back-link" onClick={()=>show('explore')}><ArrowLeft size={17}/> Volver</button>
+   <ProfilePage person={viewer&&profileTarget?.id===viewer.id?viewer:(profileTarget||viewer)!} current={viewer?.id===(profileTarget||viewer)?.id} onSave={refreshUser} notify={notify}
+    listings={items.filter(l=>l.owner_id===(profileTarget||viewer)?.id&&(l.status==='active'||l.status==='finished'||viewer?.id===l.owner_id))} onOpen={setSelected}/>
+   {viewer?.id===(profileTarget||viewer)?.id&&<button className="text-logout" onClick={()=>{void logout()}}><LogOut size={16}/> Cerrar sesión</button>}
+  </div>:
+  screen==='admin'&&viewer?.role==='admin'?<div className="inner-page"><Admin items={items} refresh={refresh} notify={notify}/></div>:null
+  }</main>
+  <footer className="footer"><div className="footer-top"><div className="footer-brand"><div className="logo-mark"><Fleur size={27}/></div><div><b>SCOUTAPOYA <span>CHN</span></b><p>La comunidad que comparte y crece.</p></div></div>
+   <div className="footer-links"><button onClick={()=>show('explore')}>Inicio</button><button onClick={support}>Apoyar</button>{access&&<button onClick={()=>show('activity')}>Mi actividad</button>}</div></div>
+   <div className="footer-bottom"><span>© {new Date().getFullYear()} ScoutApoya CHN · Proyecto comunitario</span><span>Sin cobros integrados · Sorteos sujetos a autorización · Proyecto no oficial de ASMAC salvo permiso</span></div>
+  </footer>
   {toast&&<div className={'toast'+(toast.error?' error':'')} role="status">{toast.error?<Flag size={18}/>:<CheckCircle2 size={18}/>} {toast.text}<button onClick={()=>setToast(null)} aria-label="Cerrar"><X size={16}/></button></div>}
-  
   {application&&<Modal onClose={()=>setApplication(false)}><AccessApplication onClose={()=>setApplication(false)} notify={notify} onRegister={openApprovedRegistration}/></Modal>}
   {passwordRecovery&&<Modal onClose={()=>setPasswordRecovery(false)}><PasswordRecovery onClose={()=>setPasswordRecovery(false)} notify={notify}/></Modal>}
   {auth&&<Modal onClose={()=>setAuth(null)}><Authentication mode={auth} setMode={setAuth} onClose={()=>setAuth(null)} onSuccess={async()=>{setupDismissed.current=false;await refreshUser()}} notify={notify} onApply={openApplication}/></Modal>}
+  {supportModal&&access&&<Modal onClose={()=>setSupportModal(false)}><SupportIntentModal onClose={()=>setSupportModal(false)} onSaved={()=>{if(screen==='activity')void Promise.all([backend.freeEntries(viewer!.id),backend.supportIntents(viewer!.id)]).then(([x,y])=>{setMyEntries(x);setMySupport(y)}).catch(()=>{})}} notify={notify}/></Modal>}
   {creating&&viewer&&<Modal width="850px" onClose={()=>setCreating(false)}><CreateListing user={viewer} onClose={()=>setCreating(false)} done={refresh} notify={notify}/></Modal>}
-  {selected&&access&&<Modal width="880px" onClose={()=>setSelected(null)}><Detail item={selected} user={viewer} onClose={()=>setSelected(null)} onLogin={()=>setAuth('signup')} refresh={refresh} notify={notify} onProfile={viewProfile}/></Modal>}
+  {selected&&access&&<Modal width="880px" onClose={()=>setSelected(null)}><Detail item={selected} user={viewer} onClose={()=>setSelected(null)} onLogin={()=>setAuth('login')} refresh={refresh} notify={notify} onProfile={viewProfile}/></Modal>}
  </>;
 }
