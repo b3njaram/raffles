@@ -134,6 +134,11 @@ export const backend={
    .upload(path,file,{contentType:file.type,upsert:false});
   if(r.error)throw r.error;return path;
  },
+ async removeUploaded(paths:string[],folder:'avatars'|'listings'):Promise<void>{
+  if(!paths.length)return;
+  const r=await requireCloud().storage.from(folder==='avatars'?'chn-avatars':'chn-listings').remove(paths);
+  if(r.error)throw r.error;
+ },
  async create(d:Draft,user:Profile,images:string[]){
   if(!canPublish(user))throw new Error('Publicaciones disponibles únicamente para organizadores aprobados.');
   if(images.length<1||images.length>4)throw new Error('Agrega de 1 a 4 fotografías.');
@@ -151,6 +156,15 @@ export const backend={
   if(!Number.isInteger(quantity)||quantity<1||quantity>10)throw new Error('Cantidad inválida.');
   const r=await requireCloud().rpc('chn_request_tickets',{p_listing:l.id,p_quantity:quantity});
   if(r.error)throw r.error;return String(r.data||'');
+ },
+ async cancelOrder(orderId:string):Promise<void>{
+  const r=await requireCloud().rpc('chn_cancel_ticket_order',{p_order:orderId});
+  if(r.error)throw r.error;
+ },
+ async expireOrders():Promise<number>{
+  const r=await requireCloud().rpc('chn_expire_ticket_orders');
+  if(r.error)throw r.error;
+  return Number(r.data||0);
  },
  async orders(userId?:string):Promise<TicketOrder[]>{
   const s=requireCloud();
