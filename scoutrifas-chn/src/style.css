@@ -122,3 +122,6 @@ main{min-height:65vh}.hero-shell{max-width:1230px;padding:0 20px;margin:22px aut
 .chn-form-error{padding:12px 14px;margin:15px 0;background:#fff0f0;color:#8d2a42;border-radius:12px;border:1px solid #f1cbcf;display:flex;gap:10px;align-items:flex-start;font-size:.9rem}
 .chn-form-error svg{flex-shrink:0}
 @media(max-width:560px){.chn-setup-page{padding:1rem 10px 3rem}.chn-setup-card{border-radius:17px}.chn-setup-options{flex-direction:column;align-items:stretch}}
+
+.chn-forgot-button{border:0;background:transparent;color:#654588;font-weight:700;cursor:pointer;margin-top:12px;padding:6px 0;text-decoration:underline;text-underline-offset:3px}
+.chn-forgot-button:disabled{opacity:.65;cursor:not-allowed}

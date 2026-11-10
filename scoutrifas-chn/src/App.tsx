@@ -83,7 +83,32 @@ function Authentication({mode,setMode,onClose,onSuccess,notify}:{mode:AuthMode;s
    <label>Correo electrónico<input required type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="tu@correo.com"/></label>
    <label>Contraseña<input required minLength={8} type="password" autoComplete={mode==='signup'?'new-password':'current-password'} value={password} onChange={e=>setPassword(e.target.value)}/></label>
    <button className="primary full" type="submit" disabled={busy}>{busy?'Procesando…':mode==='signup'?'Crear mi cuenta':'Entrar a ScoutRifas'}<ArrowRight size={17}/></button>
-  </form><p className="auth-foot">La admisión está sujeta a revisión. No se procesan pagos en este sitio.</p>
+  </form>
+  {mode==='login'&&<button className="chn-forgot-button" type="button" disabled={busy} onClick={async()=>{
+    try{setBusy(true);await backend.sendPasswordReset(email);notify('Si el correo está registrado, recibirás un enlace para restablecer tu contraseña.');onClose();}
+    catch(err){notify(friendlyError(err),true)}finally{setBusy(false)}
+   }}>¿Olvidaste tu contraseña?</button>}
+  <p className="auth-foot">La admisión está sujeta a revisión. No se procesan pagos en este sitio.</p>
+ </div>;
+}
+function PasswordRecovery({onClose,notify}:{onClose:()=>void;notify:(message:string,isError?:boolean)=>void}){
+ const [password,setPassword]=useState(''),[again,setAgain]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const submit=async(e:FormEvent)=>{e.preventDefault();if(busy)return;
+  if(password!==again){setError('Las contraseñas no coinciden.');return;}
+  setBusy(true);setError('');
+  try{await backend.changePassword(password);notify('Contraseña actualizada. Ya puedes usar tu cuenta.');onClose()}
+  catch(err){const message=friendlyError(err);setError(message);notify(message,true)}
+  finally{setBusy(false)}
+ };
+ return <div className="auth-content">
+   <div className="modal-brand"><span className="brand-icon"><Fleur size={25}/></span><span>SCOUT<span className="brand-strong">RIFAS</span> <sup>CHN</sup></span></div>
+   <h2>Crear nueva contraseña</h2><p className="subtle">Tu enlace de recuperación fue validado. Elige una contraseña segura para tu cuenta.</p>
+   {error&&<div className="chn-form-error" role="alert"><Flag size={18}/>{error}</div>}
+   <form className="form-col" onSubmit={submit}>
+    <label>Nueva contraseña<input type="password" required minLength={10} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)}/></label>
+    <label>Confirmar contraseña<input type="password" required minLength={10} autoComplete="new-password" value={again} onChange={e=>setAgain(e.target.value)}/></label>
+    <button disabled={busy} className="primary full" type="submit">{busy?'Actualizando…':'Guardar nueva contraseña'}<Check size={17}/></button>
+   </form>
  </div>;
 }
 function ExistingMemberJoin({done,cancel,onSkip,notify}:{done:()=>Promise<void>;cancel:()=>Promise<void>;onSkip:()=>void;notify:(s:string,e?:boolean)=>void}){
@@ -304,7 +329,7 @@ export default function App(){
  const setupDismissed=useRef(false);
  const [viewer,setViewer]=useState<Profile|null>(null),[needsEnrollment,setNeedsEnrollment]=useState(false),[items,setItems]=useState<Listing[]>([]),[loading,setLoading]=useState(true);
  const [screen,setScreen]=useState<Screen>('explore'),[profileTarget,setProfileTarget]=useState<Profile|null>(null),[selected,setSelected]=useState<Listing|null>(null);
- const [auth,setAuth]=useState<AuthMode|null>(null),[creating,setCreating]=useState(false),[menu,setMenu]=useState(false),[query,setQuery]=useState(''),[category,setCategory]=useState('Todas'),[sort,setSort]=useState('recent');
+ const [auth,setAuth]=useState<AuthMode|null>(null),[passwordRecovery,setPasswordRecovery]=useState(false),[creating,setCreating]=useState(false),[menu,setMenu]=useState(false),[query,setQuery]=useState(''),[category,setCategory]=useState('Todas'),[sort,setSort]=useState('recent');
  const [myOrders,setMyOrders]=useState<TicketOrder[]>([]),[myTickets,setMyTickets]=useState<TicketNumber[]>([]),[toast,setToast]=useState<{text:string;error:boolean}|null>(null);
  const notify=useCallback((text:string,error=false)=>setToast({text,error}),[]);
  useEffect(()=>{if(!toast)return;const id=window.setTimeout(()=>setToast(null),5500);return()=>window.clearTimeout(id)},[toast]);
@@ -328,7 +353,7 @@ export default function App(){
  },[]);
  useEffect(()=>{let active=true;
   void refreshUser().catch(err=>notify(err instanceof Error?err.message:'Error al cargar sesión.',true)).finally(()=>{if(active)setLoading(false)});
-  const observer=supabase?.auth.onAuthStateChange(()=>{window.setTimeout(()=>{if(active)void refreshUser().catch(()=>{})},0)});
+  const observer=supabase?.auth.onAuthStateChange((event)=>{if(event==='PASSWORD_RECOVERY'){setAuth(null);setPasswordRecovery(true)}window.setTimeout(()=>{if(active)void refreshUser().catch(()=>{})},0)});
   return()=>{active=false;observer?.data.subscription.unsubscribe()};
  },[refreshUser,notify]);
  useEffect(()=>{if(!canViewCatalogue(viewer))return;const interval=window.setInterval(()=>void refresh().catch(()=>{}),15000);return()=>window.clearInterval(interval)},[viewer?.id,viewer?.verified,refresh]);
@@ -414,6 +439,7 @@ export default function App(){
    <div className="footer-bottom"><span>© {new Date().getFullYear()} ScoutRifas CHN · Proyecto comunitario</span><span>Sin cobros integrados · No oficial de ASMAC salvo autorización expresa</span></div></footer>
   {toast&&<div className={'toast'+(toast.error?' error':'')} role="status">{toast.error?<Flag size={18}/>:<CheckCircle2 size={18}/>} {toast.text}<button onClick={()=>setToast(null)} aria-label="Cerrar"><X size={16}/></button></div>}
   
+  {passwordRecovery&&<Modal onClose={()=>setPasswordRecovery(false)}><PasswordRecovery onClose={()=>setPasswordRecovery(false)} notify={notify}/></Modal>}
   {auth&&<Modal onClose={()=>setAuth(null)}><Authentication mode={auth} setMode={setAuth} onClose={()=>setAuth(null)} onSuccess={async()=>{setupDismissed.current=false;await refreshUser()}} notify={notify}/></Modal>}
   {creating&&viewer&&<Modal width="680px" onClose={()=>setCreating(false)}><CreateListing user={viewer} onClose={()=>setCreating(false)} done={refresh} notify={notify}/></Modal>}
   {selected&&access&&<Modal width="880px" onClose={()=>setSelected(null)}><Detail item={selected} user={viewer} onClose={()=>setSelected(null)} onLogin={()=>setAuth('signup')} refresh={refresh} notify={notify} onProfile={viewProfile}/></Modal>}
