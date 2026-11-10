@@ -1,6 +1,6 @@
 import {createClient} from '@supabase/supabase-js';
-import type {AccessRequest,AdminReport,Category,Draft,FreeDrawEntry,Listing,MemberType,Profile,RafflePlan,SupportIntent,SupportPurpose,TicketNumber,TicketOrder} from './types';
-import {canPublish,canViewCatalogue,isScoutId} from './types';
+import type {AccessRequest,Category,FreeDrawEntry,Listing,MemberType,Profile,SupportIntent,SupportPurpose} from './types';
+import {canViewCatalogue,isScoutId} from './types';
 
 const url=import.meta.env.VITE_SUPABASE_URL;
 const key=import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -146,19 +146,6 @@ export const backend={
   const r=await requireCloud().storage.from(folder==='avatars'?'chn-avatars':'chn-listings').remove(paths);
   if(r.error)throw r.error;
  },
- async create(d:Draft,user:Profile,images:string[],plan:RafflePlan):Promise<string>{
-  if(!canPublish(user))throw new Error('Esta cuenta no puede crear rifas.');
-  if(images.length<1||images.length>10)throw new Error('Agrega entre 1 y 10 fotografías.');
-  const r=await requireCloud().rpc('chn_create_raffle_with_plan',{
-   p_title:d.title,p_description:d.description,p_category:d.category,
-   p_end_at:d.end_at,p_price:d.ticket_price,p_count:d.max_entries,
-   p_limit:d.max_per_user,p_images:images,p_prize_cost:plan.prizeCost,
-   p_other_costs:plan.otherCosts,p_profit_goal:plan.profitGoal,
-   p_fee_pct:plan.feePct
-  });
-  if(r.error)throw r.error;
-  return String(r.data);
- },
  async createFreeDraw(args:{title:string;description:string;category:Category;endAt:string;capacity:number;images:string[]}):Promise<string>{
   if(args.images.length<1||args.images.length>10)throw new Error('El sorteo necesita entre 1 y 10 fotos.');
   const r=await requireCloud().rpc('chn_create_free_draw',{
@@ -191,54 +178,6 @@ export const backend={
   const r=await requireCloud().rpc('chn_submit_support_intent',{p_amount:amount,p_purpose:purpose,p_note:note});
   if(r.error)throw r.error;
  },
- async cancelOrder(orderId:string):Promise<void>{
-  const r=await requireCloud().rpc('chn_cancel_ticket_order',{p_order:orderId});
-  if(r.error)throw r.error;
- },
- async expireOrders():Promise<number>{
-  const r=await requireCloud().rpc('chn_expire_ticket_orders');
-  if(r.error)throw r.error;
-  return Number(r.data||0);
- },
- async orders(userId?:string):Promise<TicketOrder[]>{
-  const s=requireCloud();
-  let q=s.from('chn_ticket_orders').select('*').order('created_at',{ascending:false}).limit(1000);
-  if(userId)q=q.eq('user_id',userId);
-  const r=await q;if(r.error)throw r.error;return (r.data||[]) as TicketOrder[];
- },
- async tickets(userId?:string):Promise<TicketNumber[]>{
-  const s=requireCloud();
-  let q=s.from('chn_ticket_numbers').select('*').order('issued_at',{ascending:false}).limit(1000);
-  if(userId)q=q.eq('user_id',userId);
-  const r=await q;if(r.error)throw r.error;return (r.data||[]) as TicketNumber[];
- },
- async allAdminOrders():Promise<TicketOrder[]>{
-  const s=requireCloud();
-  const result:TicketOrder[]=[];
-  for(let offset=0;offset<50000;offset+=1000){
-   const r=await s.from('chn_ticket_orders').select('*').order('created_at',{ascending:false}).range(offset,offset+999);
-   if(r.error)throw r.error;
-   const page=(r.data||[]) as TicketOrder[];
-   result.push(...page);
-   if(page.length<1000)return result;
-  }
-  throw new Error('El historial supera 50,000 solicitudes. Exporta desde Supabase por intervalos.');
- },
- async adminOverview():Promise<AdminReport>{
-  const s=requireCloud();
-  const [orders,tickets,metrics]=await Promise.all([
-   backend.orders(),backend.tickets(),s.rpc('chn_admin_metrics')
-  ]);
-  if(metrics.error)throw metrics.error;
-  if(!metrics.data)throw new Error('No se pudieron cargar las estadísticas.');
-  const m=metrics.data as Record<string,number>;
-  return {
-   orders,tickets,confirmed:Number(m.confirmed||0),pending:Number(m.pending||0),
-   totalTickets:Number(m.totalTickets||0),totalOrders:Number(m.totalOrders||0),
-   totalReference:Number(m.totalReference||0),memberCount:Number(m.memberCount||0),
-   pendingMembers:Number(m.pendingMembers||0),supportersCount:Number(m.supportersCount||0)
-  };
- },
  async members():Promise<Profile[]>{
   const r=await requireCloud().from('chn_profiles').select('*').order('created_at',{ascending:false}).limit(1000);
   if(r.error)throw r.error;return (r.data||[]) as Profile[];
@@ -251,12 +190,4 @@ export const backend={
   const r=await requireCloud().rpc('chn_review_listing',{p_listing:id,p_action:action});
   if(r.error)throw r.error;
  },
- async reviewOrder(id:string,action:'confirmed'|'cancelled'){
-  const r=await requireCloud().rpc('chn_review_ticket_order',{p_order:id,p_action:action});
-  if(r.error)throw r.error;
- },
- async recordDraw(listingId:string,ticketNo:number,reference:string){
-  const r=await requireCloud().rpc('chn_record_ticket_draw',{p_listing:listingId,p_ticket_no:ticketNo,p_draw_reference:reference});
-  if(r.error)throw r.error;
- }
 };
