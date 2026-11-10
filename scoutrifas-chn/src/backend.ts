@@ -1,5 +1,5 @@
 import {createClient} from '@supabase/supabase-js';
-import type {AdminReport,Draft,Listing,MemberType,Profile,TicketNumber,TicketOrder} from './types';
+import type {AccessRequest,AdminReport,Draft,Listing,MemberType,Profile,RafflePlan,TicketNumber,TicketOrder} from './types';
 import {canPublish,canRequestTickets,canViewCatalogue,isScoutId,salesReady} from './types';
 
 const url=import.meta.env.VITE_SUPABASE_URL;
@@ -9,6 +9,7 @@ export const demoEnabled=false;
 export function friendlyError(error:unknown):string {
  const e=error as {code?:string;status?:number;message?:string}|null;
  const message=e?.message||'';
+ if(/Database error saving new user/i.test(message))return 'La cuenta aún no tiene una solicitud de acceso aprobada o sus datos no coinciden. Solicita acceso primero.';
  if(e?.code==='23505')return 'Este ID scout ya está asociado a una cuenta. Revisa tus datos o solicita ayuda a administración.';
  if(e?.code==='42501'||e?.status===401||/permission denied|jwt expired|invalid jwt/i.test(message))return 'Tu sesión no autorizó esta operación. Cierra sesión y vuelve a iniciarla antes de reintentar.';
  if(/fetch|network|Failed to fetch/i.test(message))return 'No se pudo conectar con el servidor. Revisa tu internet y vuelve a intentarlo.';
@@ -83,24 +84,30 @@ export const backend={
   signedPhotos.clear();
   const r=await requireCloud().auth.signOut();if(r.error)throw r.error;
  },
- async enrollExisting(kind:MemberType,scoutId:string,name:string,group:string,adult:boolean,referral:string):Promise<void>{
-  const s=requireCloud();
-  const cleanedName=name.trim();
-  if(cleanedName.length<2||cleanedName.length>65)throw new Error('Escribe tu nombre completo (2 a 65 caracteres).');
-  if(kind==='scout'&&!isScoutId(scoutId))throw new Error('Introduce tu ID scout con el formato CHN.');
-  if(kind==='supporter'&&!adult)throw new Error('El registro de simpatizantes requiere mayoría de edad.');
-  const {data:{session},error:sessionError}=await s.auth.getSession();
-  if(sessionError||!session?.access_token)throw new Error('Tu sesión caducó. Cierra sesión y vuelve a entrar.');
-  const {data:{user},error:authError}=await s.auth.getUser(session.access_token);
-  if(authError||!user||user.id!==session.user.id)throw new Error('No pudimos validar tu sesión. Vuelve a iniciar sesión.');
-  const exists=await s.from('chn_profiles').select('id').eq('id',user.id).maybeSingle();
-  if(exists.error)throw exists.error;
-  if(exists.data)return;
-  const r=await s.from('chn_profiles').insert({
-   id:user.id,scout_id:kind==='scout'?scoutId:null,display_name:cleanedName,
-   group_name:kind==='scout'?group.trim().slice(0,70):'Simpatizante',
-   member_type:kind,adult_attested:adult,referral_note:kind==='supporter'?referral.trim().slice(0,120):''
+ async requestAccess(info:{email:string;name:string;kind:MemberType;scoutId:string;group:string;referral:string;adult:boolean;website:string}):Promise<void>{
+  const r=await requireCloud().rpc('chn_request_access',{
+   p_email:info.email.trim(),p_name:info.name.trim(),p_kind:info.kind,
+   p_scout_id:info.kind==='scout'?info.scoutId:'',
+   p_group:info.kind==='scout'?info.group.trim():'',
+   p_referral:info.kind==='supporter'?info.referral.trim():'',
+   p_adult:info.adult,p_website:info.website
   });
+  if(r.error)throw r.error;
+ },
+ async accessRequests():Promise<AccessRequest[]>{
+  const r=await requireCloud().from('chn_access_requests').select('*').order('created_at',{ascending:false}).limit(1000);
+  if(r.error)throw r.error;
+  return (r.data||[]) as AccessRequest[];
+ },
+ async reviewAccess(id:string,approve:boolean):Promise<void>{
+  const r=await requireCloud().rpc('chn_review_access',{p_id:id,p_approved:approve});
+  if(r.error)throw r.error;
+ },
+ async enrollExisting():Promise<void>{
+  const s=requireCloud();
+  const {data:{user},error}=await s.auth.getUser();
+  if(error||!user||!user.email_confirmed_at)throw new Error('Debes confirmar tu correo antes de activar tu acceso.');
+  const r=await s.rpc('chn_claim_approved_access');
   if(r.error)throw r.error;
  },
  async attestAdult():Promise<void>{
@@ -139,16 +146,18 @@ export const backend={
   const r=await requireCloud().storage.from(folder==='avatars'?'chn-avatars':'chn-listings').remove(paths);
   if(r.error)throw r.error;
  },
- async create(d:Draft,user:Profile,images:string[]){
-  if(!canPublish(user))throw new Error('Publicaciones disponibles únicamente para organizadores aprobados.');
-  if(images.length<1||images.length>4)throw new Error('Agrega de 1 a 4 fotografías.');
-  const r=await requireCloud().from('chn_listings').insert({
-    owner_id:user.id,title:d.title,description:d.description,
-    type:'raffle',category:d.category,image_paths:images,
-    end_at:d.end_at,ticket_price:d.ticket_price,max_entries:d.max_entries,max_per_user:d.max_per_user,
-    min_bid:0,bid_step:10
+ async create(d:Draft,user:Profile,images:string[],plan:RafflePlan):Promise<string>{
+  if(!canPublish(user))throw new Error('Esta cuenta no puede crear rifas.');
+  if(images.length<1||images.length>10)throw new Error('Agrega entre 1 y 10 fotografías.');
+  const r=await requireCloud().rpc('chn_create_raffle_with_plan',{
+   p_title:d.title,p_description:d.description,p_category:d.category,
+   p_end_at:d.end_at,p_price:d.ticket_price,p_count:d.max_entries,
+   p_limit:d.max_per_user,p_images:images,p_prize_cost:plan.prizeCost,
+   p_other_costs:plan.otherCosts,p_profit_goal:plan.profitGoal,
+   p_fee_pct:plan.feePct
   });
   if(r.error)throw r.error;
+  return String(r.data);
  },
  async requestTickets(l:Listing,user:Profile,quantity:number):Promise<string>{
   if(!canRequestTickets(user))throw new Error('La cuenta no está habilitada para solicitar boletos.');

@@ -21,6 +21,22 @@ export interface Draft {
  title:string; description:string;category:Category;end_at:string;
  ticket_price:number;max_entries:number;max_per_user:number;
 }
+export interface AccessRequest {
+ id:string;email:string;display_name:string;member_type:MemberType;scout_id:string|null;
+ group_name:string;referral_note:string;adult_attested:boolean;
+ status:'pending'|'approved'|'rejected'|'consumed';created_at:string;reviewed_at:string|null;reviewed_by:string|null;
+}
+export interface RafflePlan {
+ prizeCost:number;otherCosts:number;profitGoal:number;feePct:number;
+}
+export function calculateRaffle(price:number,count:number,plan:RafflePlan){
+ const revenue=Math.max(0,price)*Math.max(0,count);
+ const fees=revenue*Math.max(0,plan.feePct)/100;
+ const profit=revenue-fees-Math.max(0,plan.prizeCost)-Math.max(0,plan.otherCosts);
+ const breakEven=price>0&&plan.feePct<100?Math.ceil((Math.max(0,plan.prizeCost)+Math.max(0,plan.otherCosts))/(price*(1-plan.feePct/100))):Infinity;
+ const goalTickets=price>0&&plan.feePct<100?Math.ceil((Math.max(0,plan.prizeCost)+Math.max(0,plan.otherCosts)+Math.max(0,plan.profitGoal))/(price*(1-plan.feePct/100))):Infinity;
+ return {revenue,fees,profit,breakEven,goalTickets,margin:revenue>0?100*profit/revenue:0,goalMet:profit>=plan.profitGoal};
+}
 export interface TicketOrder {
  id:string;listing_id:string;user_id:string;quantity:number;unit_price:number;total_price:number;
  status:'pending'|'confirmed'|'cancelled'|'expired';expires_at:string;created_at:string;
@@ -33,6 +49,7 @@ export interface AdminReport {
  orders:TicketOrder[];tickets:TicketNumber[];confirmed:number;pending:number;totalTickets:number;
  totalOrders:number;totalReference:number;memberCount:number;pendingMembers:number;supportersCount:number;
 }
+export const defaultRafflePlan:RafflePlan={prizeCost:0,otherCosts:0,profitGoal:2000,feePct:0};
 export const defaultDraft:Draft={
  title:'',description:'',category:'Aventura',end_at:'',ticket_price:50,max_entries:100,max_per_user:5
 };
