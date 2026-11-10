@@ -2,8 +2,8 @@ import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import type {FormEvent,ReactNode} from 'react';
 import {ArrowLeft,ArrowRight,BarChart3,Check,CheckCircle2,ChevronDown,Clock3,Compass,Flag,Heart,ImagePlus,LogIn,LogOut,Menu,Mountain,Plus,Search,ShieldCheck,Sparkles,Ticket,Upload,Users,X} from 'lucide-react';
 import {backend,cloud,friendlyError,imageUrl,supabase} from './backend';
-import type {Category,Draft,Listing,MemberType,Profile,TicketOrder,TicketNumber,AdminReport} from './types';
-import {canPublish,canRequestTickets,canViewCatalogue,categories,defaultDraft,formatId,isLive,isScoutId,money,remaining,salesReady} from './types';
+import type {AccessRequest,Category,Draft,Listing,MemberType,Profile,RafflePlan,TicketOrder,TicketNumber,AdminReport} from './types';
+import {calculateRaffle,canPublish,canRequestTickets,canViewCatalogue,categories,defaultDraft,defaultRafflePlan,formatId,isLive,isScoutId,money,remaining,salesReady} from './types';
 import './style.css';
 
 type Screen='explore'|'setup'|'mine'|'activity'|'profile'|'admin';
@@ -179,34 +179,82 @@ function Detail({item,user,onClose,onLogin,refresh,notify,onProfile}:{item:Listi
  </div>;
 }
 function CreateListing({user,onClose,done,notify}:{user:Profile;onClose:()=>void;done:()=>Promise<void>;notify:(s:string,e?:boolean)=>void}){
- const [draft,setDraft]=useState<Draft>(defaultDraft),[photos,setPhotos]=useState<File[]>([]),[busy,setBusy]=useState(false);
+ const [draft,setDraft]=useState<Draft>({...defaultDraft}),[plan,setPlan]=useState<RafflePlan>({...defaultRafflePlan});
+ const [photos,setPhotos]=useState<File[]>([]),[busy,setBusy]=useState(false);
+ const preview=useMemo(()=>photos.map(file=>({name:file.name,url:URL.createObjectURL(file)})),[photos]);
+ useEffect(()=>()=>{preview.forEach(p=>URL.revokeObjectURL(p.url))},[preview]);
  const set=<K extends keyof Draft>(field:K,value:Draft[K])=>setDraft(d=>({...d,[field]:value}));
+ const setPlanValue=<K extends keyof RafflePlan>(field:K,value:RafflePlan[K])=>setPlan(p=>({...p,[field]:value}));
+ const calc=calculateRaffle(draft.ticket_price,draft.max_entries,plan);
+ const addPhotos=(incoming:File[])=>{
+  const accepted=incoming.filter(f=>['image/jpeg','image/png','image/webp'].includes(f.type)&&f.size<=5*1024*1024);
+  if(accepted.length!==incoming.length)notify('Solo JPG, PNG o WebP y máximo 5 MB por imagen.',true);
+  const available=10-photos.length;
+  if(accepted.length>available)notify('Puedes tener un máximo de 10 fotografías.',true);
+  setPhotos(previous=>[...previous,...accepted.slice(0,Math.max(0,available))]);
+ };
  const submit=async(e:FormEvent)=>{
   e.preventDefault();if(busy)return;
   if(new Date(draft.end_at).getTime()<Date.now()+3600000){notify('El cierre debe ser al menos una hora después de ahora.',true);return;}
-  if(!photos.length){notify('Agrega una fotografía al menos.',true);return;}
-  setBusy(true);try{
-   const paths=await Promise.all(photos.map(p=>backend.upload(p,user.id,'listings')));
-   await backend.create({...draft,end_at:new Date(draft.end_at).toISOString()},user,paths);
-   notify('Rifa preparada y enviada a revisión. Los boletos no se habilitan sin autorización.');
+  if(!photos.length||photos.length>10){notify('Agrega de 1 a 10 fotografías.',true);return;}
+  if(draft.max_per_user>draft.max_entries){notify('El límite por persona no debe exceder el total de boletos.',true);return;}
+  if(Object.values(plan).some(v=>!Number.isFinite(v)||v<0)){notify('Revisa los montos de la calculadora.',true);return;}
+  setBusy(true);
+  const uploaded:string[]=[];
+  try{
+   for(const photo of photos)uploaded.push(await backend.upload(photo,user.id,'listings'));
+   await backend.create({...draft,end_at:new Date(draft.end_at).toISOString()},user,uploaded,plan);
+   notify('Rifa preparada con sus fotos y presupuesto privado. Pendiente de aprobación y autorización legal para los boletos.');
    await done();onClose();
-  }catch(err){notify(err instanceof Error?err.message:'Error al crear rifa.',true)}finally{setBusy(false)}
+  }catch(err){
+   if(uploaded.length)await backend.removeUploaded(uploaded,'listings').catch(()=>{});
+   notify(friendlyError(err),true)
+  }finally{setBusy(false)}
  };
- return <div className="create-modal"><span className="kicker">UNA NUEVA AVENTURA</span><h2>Preparar rifa por boletos</h2>
-  <p className="subtle">Define el premio, precio y cupo. La administración revisará la publicación; la venta permanecerá cerrada mientras no exista permiso aplicable.</p>
+ return <div className="create-modal chn-create-modal">
+  <span className="kicker">UNA NUEVA AVENTURA</span><h2>Preparar rifa por boletos</h2>
+  <p className="subtle">Describe el premio, calcula tu meta y agrega fotografías. La venta seguirá desactivada hasta contar con la autorización correspondiente.</p>
   <form className="form-col" onSubmit={submit}>
    <label>Título<input required minLength={5} maxLength={110} value={draft.title} onChange={e=>set('title',e.target.value)} placeholder="Ej. Mochila de aventura"/></label>
-   <label>Descripción y condiciones<textarea required minLength={20} maxLength={2500} rows={4} value={draft.description} onChange={e=>set('description',e.target.value)} placeholder="Describe el premio, su valor, condiciones y fecha prevista de entrega."/></label>
+   <label>Descripción y condiciones<textarea required minLength={20} maxLength={2500} rows={4} value={draft.description} onChange={e=>set('description',e.target.value)} placeholder="Describe el premio, su valor, condiciones y la entrega."/></label>
    <div className="two-fields"><label>Categoría<select value={draft.category} onChange={e=>set('category',e.target.value as Category)}>{categories.map(c=><option key={c}>{c}</option>)}</select></label>
     <label>Fecha de cierre<input required type="datetime-local" value={draft.end_at} onChange={e=>set('end_at',e.target.value)}/></label></div>
-   <div className="two-fields"><label>Precio por boleto (MXN)<input required type="number" min={1} max={100000} value={draft.ticket_price} onChange={e=>set('ticket_price',Number(e.target.value))}/></label>
-    <label>Boletos disponibles<input required type="number" min={1} max={100000} value={draft.max_entries} onChange={e=>set('max_entries',Number(e.target.value))}/></label></div>
-   <label>Máximo de boletos por persona<input required type="number" min={1} max={10} value={draft.max_per_user} onChange={e=>set('max_per_user',Number(e.target.value))}/></label>
-   <label>Fotografías (1 a 4, hasta 5 MB cada una)<div className="upload-zone"><ImagePlus size={25}/><b>Agregar imágenes</b><small>JPG, PNG o WebP</small>
-    <input type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={e=>{const list=Array.from(e.target.files||[]);setPhotos(list.slice(0,4));if(list.length>4)notify('Máximo cuatro fotos.',true)}}/></div></label>
-   {photos.length>0&&<div className="file-list">{photos.map((p,i)=><span key={i}>{p.name}</span>)}</div>}
-   <div className="notice"><ShieldCheck size={18}/> La venta solo podrá habilitarse después de verificar la documentación legal del sorteo.</div>
-   <button className="primary full" disabled={busy} type="submit">{busy?'Guardando…':'Enviar a revisión'}<ArrowRight size={17}/></button>
+   <div className="two-fields"><label>Precio por boleto (MXN)<input required type="number" min={1} max={100000} step={1} value={draft.ticket_price} onChange={e=>set('ticket_price',Math.max(0,Number(e.target.value)))}/></label>
+    <label>Boletos disponibles<input required type="number" min={1} max={100000} step={1} value={draft.max_entries} onChange={e=>set('max_entries',Math.max(0,Number(e.target.value)))}/></label></div>
+   <label>Máximo de boletos por persona<input required type="number" min={1} max={10} step={1} value={draft.max_per_user} onChange={e=>set('max_per_user',Number(e.target.value))}/></label>
+   <section className="chn-profit-planner" aria-label="Calculadora de rentabilidad">
+    <div className="chn-planner-title"><span className="chn-planner-icon">🧮</span><div><h3>Calculadora de tu rifa</h3><p>Planea tus metas antes de publicar. Solo tú y la administración podrán ver estos costos.</p></div></div>
+    <div className="two-fields">
+     <label>¿Cuánto cuesta el premio? (MXN)<input type="number" min={0} max={100000000} step={1} value={plan.prizeCost} onChange={e=>setPlanValue('prizeCost',Math.max(0,Number(e.target.value)))}/></label>
+     <label>Otros gastos estimados (MXN)<input type="number" min={0} max={100000000} step={1} value={plan.otherCosts} onChange={e=>setPlanValue('otherCosts',Math.max(0,Number(e.target.value)))}/></label>
+    </div>
+    <div className="two-fields">
+     <label>¿Cuánto quieres ganar NETO? (MXN)<input type="number" min={0} max={100000000} step={1} value={plan.profitGoal} onChange={e=>setPlanValue('profitGoal',Math.max(0,Number(e.target.value)))}/></label>
+     <label>Simular comisión de plataforma<select value={plan.feePct} onChange={e=>setPlanValue('feePct',Number(e.target.value))}><option value={0}>0% · sin comisión</option><option value={3}>3%</option><option value={5}>5%</option><option value={10}>10%</option></select></label>
+    </div>
+    <div className="chn-profit-grid">
+     <div><small>Ingreso bruto al vender todo</small><strong>{money(calc.revenue)}</strong></div>
+     <div><small>Comisión simulada</small><strong>{money(calc.fees)}</strong></div>
+     <div><small>Ganancia neta estimada</small><strong className={calc.profit>=0?'chn-value-positive':'chn-value-negative'}>{money(calc.profit)}</strong></div>
+     <div><small>Boletos para recuperar gastos</small><strong>{Number.isFinite(calc.breakEven)?calc.breakEven.toLocaleString('es-MX'):'—'}</strong></div>
+    </div>
+    <div className="chn-target-progress"><div className="chn-target-track"><span style={{width:Math.max(0,Math.min(100,plan.profitGoal>0?100*Math.max(0,calc.profit)/plan.profitGoal:100))+'%'}}/></div>
+     <p>{calc.goalMet?'✓ Alcanzas tu meta de ganancia.':'Faltarían '+money(plan.profitGoal-calc.profit)+' para alcanzar tu meta.'} Se necesitan aproximadamente <b>{Number.isFinite(calc.goalTickets)?calc.goalTickets.toLocaleString('es-MX'):'—'} boletos</b> al precio elegido.</p>
+     {!calc.goalMet&&calc.goalTickets>draft.max_entries&&<p className="chn-planner-warning">Con esta cantidad y precio de boletos, no alcanzarías la meta. Aumenta boletos o ajusta el precio.</p>}
+    </div>
+    <small className="chn-planner-legal">Proyección si se vende el 100% del cupo. No incluye impuestos, permisos ni cargos no indicados. La comisión es solo una simulación, no un cobro habilitado.</small>
+   </section>
+   <label>Fotografías ({photos.length}/10, hasta 5 MB cada una)
+    <div className="upload-zone"><ImagePlus size={25}/><b>{photos.length?'Agregar más imágenes':'Elegir imágenes del premio'}</b><small>Hasta 10 fotos JPG, PNG o WebP</small>
+     <input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={busy||photos.length>=10} onChange={e=>{addPhotos(Array.from(e.target.files||[]));e.target.value='';}}/>
+    </div></label>
+   {preview.length>0&&<div className="chn-upload-previews">{preview.map((p,index)=><div className="chn-preview" key={p.url}>
+    <img src={p.url} alt={'Foto seleccionada '+String(index+1)}/>
+    <button type="button" aria-label={'Quitar '+p.name} disabled={busy} onClick={()=>setPhotos(current=>current.filter((_,i)=>i!==index))}><X size={16}/></button>
+    <span>{index+1}</span>
+   </div>)}</div>}
+   <div className="notice"><ShieldCheck size={18}/> Preparar y aprobar una publicación no autoriza vender boletos. La operación real requiere documentación y permiso aplicables.</div>
+   <button className="primary full" disabled={busy} type="submit">{busy?'Guardando fotos y presupuesto…':'Guardar rifa para revisión'}<ArrowRight size={17}/></button>
   </form>
  </div>;
 }
