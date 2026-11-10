@@ -1,12 +1,12 @@
-import {useCallback,useEffect,useMemo,useState} from 'react';
+import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import type {FormEvent,ReactNode} from 'react';
 import {ArrowLeft,ArrowRight,BarChart3,Check,CheckCircle2,ChevronDown,Clock3,Compass,Flag,Heart,ImagePlus,LogIn,LogOut,Menu,Mountain,Plus,Search,ShieldCheck,Sparkles,Ticket,Upload,Users,X} from 'lucide-react';
-import {backend,cloud,imageUrl,supabase} from './backend';
+import {backend,cloud,friendlyError,imageUrl,supabase} from './backend';
 import type {Category,Draft,Listing,MemberType,Profile,TicketOrder,TicketNumber,AdminReport} from './types';
 import {canPublish,canRequestTickets,canViewCatalogue,categories,defaultDraft,formatId,isLive,isScoutId,money,remaining,salesReady} from './types';
 import './style.css';
 
-type Screen='explore'|'mine'|'activity'|'profile'|'admin';
+type Screen='explore'|'setup'|'mine'|'activity'|'profile'|'admin';
 type AuthMode='login'|'signup';
 const sampleHero='https://images.unsplash.com/photo-1500534623283-312aade485b7?w=1600&q=80';
 const categoryIcons:Record<Category,string>={Aventura:'⛺',Equipo:'🎒',Coleccionables:'🏅',Experiencias:'🏕️',Arte:'🎨',Otros:'✨'};
@@ -63,8 +63,8 @@ function Authentication({mode,setMode,onClose,onSuccess,notify}:{mode:AuthMode;s
     const session=await backend.signup(email.trim(),password,name.trim(),kind,formatId(id),group.trim(),adult,referral.trim());
     if(session){await onSuccess();notify('Registro recibido. La comunidad revisará tu solicitud.');onClose();}
     else{notify('Revisa tu correo de confirmación, después inicia sesión.');setMode('login');}
-   }else{await backend.login(email.trim(),password);await onSuccess();notify('¡Bienvenido!');onClose();}
-  }catch(err){notify(err instanceof Error?err.message:'No fue posible completar el acceso.',true)}finally{setBusy(false)}
+   }else{await backend.login(email.trim(),password);await onSuccess();notify('Sesión iniciada correctamente.');onClose();}
+  }catch(err){notify(friendlyError(err),true)}finally{setBusy(false)}
  };
  return <div className="auth-content">
   <div className="modal-brand"><span className="brand-icon"><Fleur size={25}/></span><span>SCOUT<span className="brand-strong">RIFAS</span> <sup>CHN</sup></span></div>
@@ -86,21 +86,26 @@ function Authentication({mode,setMode,onClose,onSuccess,notify}:{mode:AuthMode;s
   </form><p className="auth-foot">La admisión está sujeta a revisión. No se procesan pagos en este sitio.</p>
  </div>;
 }
-function ExistingMemberJoin({done,cancel,notify}:{done:()=>Promise<void>;cancel:()=>Promise<void>;notify:(s:string,e?:boolean)=>void}){
+function ExistingMemberJoin({done,cancel,onSkip,notify}:{done:()=>Promise<void>;cancel:()=>Promise<void>;onSkip:()=>void;notify:(s:string,e?:boolean)=>void}){
  const [kind,setKind]=useState<MemberType>('supporter'),[name,setName]=useState(''),[id,setId]=useState('CHN-'),[group,setGroup]=useState('');
- const [referral,setReferral]=useState(''),[adult,setAdult]=useState(false),[busy,setBusy]=useState(false);
- const submit=async(e:FormEvent)=>{e.preventDefault();if(busy)return;setBusy(true);
-  try{await backend.enrollExisting(kind,formatId(id),name.trim(),group.trim(),adult,referral.trim());await done();notify('Solicitud registrada; pendiente de aprobación.')}
-  catch(err){notify(err instanceof Error?err.message:'No se pudo completar el perfil.',true)}finally{setBusy(false)}
+ const [referral,setReferral]=useState(''),[adult,setAdult]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const submit=async(e:FormEvent)=>{e.preventDefault();if(busy)return;setBusy(true);setError('');
+  try{await backend.enrollExisting(kind,formatId(id),name.trim(),group.trim(),adult,referral.trim());await done();notify('Perfil guardado. Ya puedes consultar el estado de tu cuenta.')}
+  catch(err){const message=friendlyError(err);setError(message);notify(message,true)}
+  finally{setBusy(false)}
  };
- return <div className="auth-content"><span className="kicker">COMPLETA TU PERFIL</span><h2>Bienvenido a ScoutRifas</h2><p className="subtle">Tu sesión ya está activa. Completa tus datos para ingresar a la comunidad.</p>
+ return <div className="auth-content">
+  <span className="kicker">COMPLETA TU PERFIL</span><h2>Bienvenido a ScoutRifas</h2>
+  <p className="subtle">Tu cuenta ya está conectada. Completa estos datos una sola vez para solicitar acceso a la comunidad.</p>
+  {error&&<div className="chn-form-error" role="alert"><Flag size={18}/><span>{error}</span></div>}
   <form className="form-col" onSubmit={submit}><KindPicker kind={kind} setKind={setKind}/>
-   <label>Nombre<input required minLength={2} maxLength={65} value={name} onChange={e=>setName(e.target.value)}/></label>
-   {kind==='scout'?<><label>ID scout<input required maxLength={16} value={id} pattern="CHN-?[A-Za-z0-9]{4,12}" onChange={e=>setId(e.target.value.toUpperCase())}/></label><label>Grupo<input value={group} maxLength={70} onChange={e=>setGroup(e.target.value)}/></label></>:
-   <label>Referencia o invitación (opcional)<input maxLength={120} value={referral} onChange={e=>setReferral(e.target.value)}/></label>}
-   <label className="chn-check"><input type="checkbox" checked={adult} onChange={e=>setAdult(e.target.checked)}/> Confirmo ser mayor de edad.</label>
-   <button type="submit" className="primary full" disabled={busy}>{busy?'Guardando…':'Completar registro'} <ArrowRight size={17}/></button>
-  </form><button className="text-logout" type="button" onClick={()=>{void cancel()}}>Cambiar de cuenta</button>
+   <label>Nombre<input required minLength={2} maxLength={65} value={name} onChange={e=>setName(e.target.value)} autoComplete="name"/></label>
+   {kind==='scout'?<><label>ID scout<input required maxLength={16} value={id} pattern="CHN-?[A-Za-z0-9]{4,12}" onChange={e=>setId(e.target.value.toUpperCase())}/></label><label>Grupo scout<input maxLength={70} value={group} onChange={e=>setGroup(e.target.value)}/></label></>:
+    <label>Referencia o invitación (opcional)<input maxLength={120} value={referral} onChange={e=>setReferral(e.target.value)}/></label>}
+   <label className="chn-check"><input type="checkbox" checked={adult} onChange={e=>setAdult(e.target.checked)}/> Confirmo tener 18 años o más{kind==='scout'?' (para poder solicitar boletos)':''}.</label>
+   <button type="submit" className="primary full" disabled={busy}>{busy?'Guardando…':'Completar registro'}<ArrowRight size={17}/></button>
+  </form>
+  <div className="chn-setup-options"><button type="button" className="secondary" onClick={onSkip}>Ahora no, volver al inicio</button><button type="button" className="text-logout" onClick={()=>{void cancel()}}>Cerrar sesión</button></div>
  </div>;
 }
 function Detail({item,user,onClose,onLogin,refresh,notify,onProfile}:{item:Listing;user:Profile|null;onClose:()=>void;onLogin:()=>void;refresh:()=>Promise<void>;notify:(s:string,e?:boolean)=>void;onProfile:(p:Profile)=>void}){
@@ -296,6 +301,7 @@ function Admin({items,refresh,notify}:{items:Listing[];refresh:()=>Promise<void>
  </section>;
 }
 export default function App(){
+ const setupDismissed=useRef(false);
  const [viewer,setViewer]=useState<Profile|null>(null),[needsEnrollment,setNeedsEnrollment]=useState(false),[items,setItems]=useState<Listing[]>([]),[loading,setLoading]=useState(true);
  const [screen,setScreen]=useState<Screen>('explore'),[profileTarget,setProfileTarget]=useState<Profile|null>(null),[selected,setSelected]=useState<Listing|null>(null);
  const [auth,setAuth]=useState<AuthMode|null>(null),[creating,setCreating]=useState(false),[menu,setMenu]=useState(false),[query,setQuery]=useState(''),[category,setCategory]=useState('Todas'),[sort,setSort]=useState('recent');
@@ -304,10 +310,21 @@ export default function App(){
  useEffect(()=>{if(!toast)return;const id=window.setTimeout(()=>setToast(null),5500);return()=>window.clearTimeout(id)},[toast]);
  const refresh=useCallback(async()=>{const list=await backend.list();setItems(list);setSelected(current=>current?list.find(l=>l.id===current.id)||null:null)},[]);
  const refreshUser=useCallback(async()=>{
-  const person=await backend.session();setViewer(person);
-  setNeedsEnrollment(!person&&cloud?await backend.isSignedIn():false);
-  if(canViewCatalogue(person)){setItems(await backend.list())}
-  else {setItems([]);setSelected(null);setMyOrders([]);setMyTickets([]);setScreen('explore')}
+  const person=await backend.session();
+  const hasAccountWithoutProfile=!person&&cloud?await backend.isSignedIn():false;
+  setViewer(person);
+  setNeedsEnrollment(hasAccountWithoutProfile);
+  if(hasAccountWithoutProfile){
+   setItems([]);setSelected(null);setMyOrders([]);setMyTickets([]);
+   if(!setupDismissed.current)setScreen(current=>current==='setup'?current:'setup');
+  }else if(canViewCatalogue(person)){
+   setItems(await backend.list());
+   if(person?.role==='admin')setScreen(current=>current==='explore'||current==='setup'?'admin':current);
+   else setScreen(current=>current==='setup'?'explore':current);
+  }else{
+   setItems([]);setSelected(null);setMyOrders([]);setMyTickets([]);
+   setScreen(current=>current==='setup'?'explore':current);
+  }
  },[]);
  useEffect(()=>{let active=true;
   void refreshUser().catch(err=>notify(err instanceof Error?err.message:'Error al cargar sesión.',true)).finally(()=>{if(active)setLoading(false)});
@@ -324,13 +341,13 @@ export default function App(){
   if(category!=='Todas')list=list.filter(l=>l.category===category);
   return [...list].sort((a,b)=>sort==='ending'?new Date(a.end_at).getTime()-new Date(b.end_at).getTime():sort==='popular'?b.entry_count-a.entry_count:new Date(b.created_at).getTime()-new Date(a.created_at).getTime());
  },[access,items,query,category,sort]);
- const show=(screenName:Screen)=>{if(screenName!=='explore'&&!access){if(!viewer)setAuth('login');else notify('Tu cuenta está pendiente de activación.',true);return;}
+ const show=(screenName:Screen)=>{if(screenName==='setup'&&needsEnrollment){setupDismissed.current=false;setScreen('setup');return;}if(screenName!=='explore'&&!access && !(screenName==='profile'&&viewer)){if(!viewer)setAuth('login');else notify('Tu cuenta está pendiente de activación.',true);return;}
   if(screenName==='admin'&&viewer?.role!=='admin'){notify('Área privada.',true);return;}
   setScreen(screenName);setProfileTarget(null);setMenu(false);window.scrollTo({top:0,behavior:'smooth'});
  };
  const openCreate=()=>{if(!viewer){setAuth('signup');return;}if(!canPublish(viewer)){notify('Tu cuenta no tiene permisos para organizar rifas.',true);return;}setCreating(true)};
  const viewProfile=(p:Profile)=>{setProfileTarget(p);setScreen('profile');setSelected(null);window.scrollTo({top:0,behavior:'smooth'})};
- const logout=async()=>{try{await backend.logout();setViewer(null);setNeedsEnrollment(false);setItems([]);setSelected(null);setProfileTarget(null);setScreen('explore');notify('Sesión cerrada.')}catch(err){notify(err instanceof Error?err.message:'Error',true)}};
+ const logout=async()=>{try{await backend.logout();setupDismissed.current=false;setViewer(null);setNeedsEnrollment(false);setItems([]);setSelected(null);setProfileTarget(null);setScreen('explore');notify('Sesión cerrada.')}catch(err){notify(err instanceof Error?err.message:'Error',true)}};
  const mine=access?items.filter(l=>l.owner_id===viewer?.id):[],totalActive=items.filter(isLive).length;
  return <>
   <header className="site-header"><div className="nav-container">
@@ -343,7 +360,7 @@ export default function App(){
    </nav>
    <div className="nav-right">{canPublish(viewer)&&<button className="create-nav" onClick={openCreate}><Plus size={18}/> Crear rifa</button>}
     {viewer?<button className="account" onClick={()=>viewProfile(viewer)}><Avatar user={viewer} size={34}/><span>{viewer.display_name.split(' ')[0]}</span><ChevronDown size={15}/></button>:
-     cloud?<button className="sign-in" onClick={()=>setAuth('login')}><LogIn size={17}/> Iniciar sesión</button>:null}
+     needsEnrollment?<button className="sign-in" onClick={()=>show('setup')}><CheckCircle2 size={17}/> Completar perfil</button>:cloud?<button className="sign-in" onClick={()=>setAuth('login')}><LogIn size={17}/> Iniciar sesión</button>:null}
     <button className="menu-button" onClick={()=>setMenu(!menu)} aria-label="Abrir menú"><Menu size={24}/></button>
    </div></div></header>
   <main>{screen==='explore'?<>
@@ -351,7 +368,7 @@ export default function App(){
     <div className="hero-content"><span className="hero-label"><span className="hero-star">✦</span> PROVINCIA CHIHUAHUA NORTE</span>
      <h1>Compartir también<br/>es una <em>aventura.</em></h1>
      <p>Únete a quienes ayudan a que nuevas aventuras, proyectos y buenas acciones se conviertan en realidad.</p>
-     <div className="hero-actions"><button className="hero-primary" onClick={()=>access?document.getElementById('explorar')?.scrollIntoView({behavior:'smooth'}):setAuth('signup')}>
+     <div className="hero-actions"><button className="hero-primary" onClick={()=>access?document.getElementById('explorar')?.scrollIntoView({behavior:'smooth'}):needsEnrollment?show('setup'):setAuth('signup')}>
       {access?'Explorar las rifas':'Quiero apoyar'} <ArrowRight size={18}/></button>
       {access&&canPublish(viewer)&&<button className="hero-secondary" onClick={openCreate}><Plus size={18}/> Organizar una rifa</button>}
      </div></div><div className="hero-stamp"><Fleur size={27}/><span>SIEMPRE<br/>LISTOS</span></div>
@@ -368,11 +385,15 @@ export default function App(){
      {loading?<div className="empty"><Compass className="spin" size={38}/> Cargando rifas…</div>:results.length?<div className="cards-grid">{results.map(l=><Card key={l.id} item={l} onOpen={()=>setSelected(l)}/>)}</div>:
       <div className="empty"><Compass size={42}/><h3>Sin rifas para mostrar</h3><p>Prueba otra búsqueda o vuelve pronto.</p><button className="secondary" onClick={()=>{setQuery('');setCategory('Todas')}}>Quitar filtros</button></div>}
     </section>:<section className="explore-section private-welcome"><div className="private-welcome-inner"><Compass size={34}/><h2>{viewer?'Bienvenido a la comunidad':'Tu próxima aventura empieza aquí'}</h2>
-     <p>{viewer?'Estamos revisando tu solicitud de acceso.':cloud?'Inicia sesión o únete para descubrir lo que estamos preparando.':'Este espacio se encuentra en preparación.'}</p>
-     {!viewer&&cloud&&<button className="primary" onClick={()=>setAuth('signup')}>Crear cuenta <ArrowRight size={17}/></button>}
+     <p>{viewer?'Estamos revisando tu solicitud de acceso.':needsEnrollment?'Tienes un registro sin completar. Puedes terminarlo cuando quieras.':cloud?'Inicia sesión o únete para descubrir lo que estamos preparando.':'Este espacio se encuentra en preparación.'}</p>
+     {!viewer&&cloud&&<button className="primary" onClick={()=>needsEnrollment?show('setup'):setAuth('signup')}>{needsEnrollment?'Completar perfil':'Crear cuenta'} <ArrowRight size={17}/></button>}
     </div></section>}
    {access&&canPublish(viewer)&&<section className="cta-panel"><div className="cta-ornament"><Fleur size={85}/></div><div><span className="kicker light">TU SIGUIENTE BUENA ACCIÓN</span><h2>¿Tienes un premio para compartir?</h2><p>Prepara una rifa y envíala a revisión. Solo las rifas autorizadas podrán distribuir boletos.</p></div><button onClick={openCreate} className="cta-button">Preparar rifa <ArrowRight size={19}/></button></section>}
-   </>:screen==='mine'?<section className="inner-page"><div className="section-title"><div><span className="kicker">MIS ACTIVIDADES</span><h2>Mis rifas</h2><p>Publicaciones y estado de cada sorteo que organizas.</p></div><button className="primary" onClick={openCreate}><Plus size={17}/> Nueva rifa</button></div>
+   </>:screen==='setup'?<section className="inner-page chn-setup-page">
+     <div className="chn-setup-card"><div className="chn-setup-badge"><Fleur size={27}/></div>
+      <ExistingMemberJoin done={refreshUser} cancel={logout} onSkip={()=>{setupDismissed.current=true;setScreen('explore')}} notify={notify}/>
+     </div>
+    </section>:screen==='mine'?<section className="inner-page"><div className="section-title"><div><span className="kicker">MIS ACTIVIDADES</span><h2>Mis rifas</h2><p>Publicaciones y estado de cada sorteo que organizas.</p></div><button className="primary" onClick={openCreate}><Plus size={17}/> Nueva rifa</button></div>
     {mine.length?<div className="cards-grid">{mine.map(l=><Card key={l.id} item={l} onOpen={()=>setSelected(l)}/>)}</div>:
      <div className="empty"><Ticket size={38}/><h3>Aún no organizas rifas</h3><button className="primary" onClick={openCreate}>Preparar mi primera rifa</button></div>}
    </section>:screen==='activity'?<section className="inner-page"><div className="section-title"><div><span className="kicker">MIS PARTICIPACIONES</span><h2>Mis boletos</h2><p>Solicitudes, confirmaciones y folios asignados.</p></div><Ticket size={40} className="page-icon"/></div>
@@ -392,8 +413,8 @@ export default function App(){
   <footer className="footer"><div className="footer-top"><div className="footer-brand"><div className="logo-mark"><Fleur size={27}/></div><div><b>SCOUTRIFAS <span>CHN</span></b><p>La comunidad que comparte y crece.</p></div></div><div className="footer-links"><button onClick={()=>show('explore')}>Inicio</button>{access&&<button onClick={()=>show('activity')}>Mis boletos</button>}{canPublish(viewer)&&<button onClick={openCreate}>Crear rifa</button>}</div></div>
    <div className="footer-bottom"><span>© {new Date().getFullYear()} ScoutRifas CHN · Proyecto comunitario</span><span>Sin cobros integrados · No oficial de ASMAC salvo autorización expresa</span></div></footer>
   {toast&&<div className={'toast'+(toast.error?' error':'')} role="status">{toast.error?<Flag size={18}/>:<CheckCircle2 size={18}/>} {toast.text}<button onClick={()=>setToast(null)} aria-label="Cerrar"><X size={16}/></button></div>}
-  {needsEnrollment&&!auth&&!loading&&<Modal onClose={()=>{void backend.logout().then(refreshUser)}}><ExistingMemberJoin done={refreshUser} cancel={async()=>{await backend.logout();await refreshUser()}} notify={notify}/></Modal>}
-  {auth&&<Modal onClose={()=>setAuth(null)}><Authentication mode={auth} setMode={setAuth} onClose={()=>setAuth(null)} onSuccess={refreshUser} notify={notify}/></Modal>}
+  
+  {auth&&<Modal onClose={()=>setAuth(null)}><Authentication mode={auth} setMode={setAuth} onClose={()=>setAuth(null)} onSuccess={async()=>{setupDismissed.current=false;await refreshUser()}} notify={notify}/></Modal>}
   {creating&&viewer&&<Modal width="680px" onClose={()=>setCreating(false)}><CreateListing user={viewer} onClose={()=>setCreating(false)} done={refresh} notify={notify}/></Modal>}
   {selected&&access&&<Modal width="880px" onClose={()=>setSelected(null)}><Detail item={selected} user={viewer} onClose={()=>setSelected(null)} onLogin={()=>setAuth('signup')} refresh={refresh} notify={notify} onProfile={viewProfile}/></Modal>}
  </>;

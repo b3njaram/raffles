@@ -112,3 +112,13 @@ main{min-height:65vh}.hero-shell{max-width:1230px;padding:0 20px;margin:22px aut
 .detail-thumbnails img{width:100%;height:100%;object-fit:cover}
 @media(max-width:850px){.chn-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-toolbar,.admin-filter{flex-wrap:wrap}.progress-row{flex-wrap:wrap}.progress-row .progress-track{width:100%}}
 @media(max-width:500px){.ticket-price-row strong{font-size:1rem}.ticket-detail-price strong{font-size:1.6rem}.chn-kind-picker{grid-template-columns:repeat(2,minmax(0,1fr))}.chn-stats .stat>b{font-size:1.15rem}.chn-draw-fields{grid-template-columns:1fr}.chn-draw-fields button{grid-column:span 1}}
+
+/* Registro de membresía en página y errores visibles, sin ventanas persistentes */
+.chn-setup-page{min-height:65vh;display:flex;justify-content:center;align-items:flex-start;padding-block:3rem 5rem}
+.chn-setup-card{background:#fff;border:1px solid #eee6ef;border-radius:24px;box-shadow:0 16px 50px rgba(49,30,69,.11);width:min(100%,610px);padding:clamp(20px,4vw,44px)}
+.chn-setup-card .auth-content{max-width:none}
+.chn-setup-badge{height:50px;width:50px;background:#f1e8f6;color:#60418c;border-radius:16px;display:flex;align-items:center;justify-content:center;margin-bottom:8px}
+.chn-setup-options{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-top:18px}
+.chn-form-error{padding:12px 14px;margin:15px 0;background:#fff0f0;color:#8d2a42;border-radius:12px;border:1px solid #f1cbcf;display:flex;gap:10px;align-items:flex-start;font-size:.9rem}
+.chn-form-error svg{flex-shrink:0}
+@media(max-width:560px){.chn-setup-page{padding:1rem 10px 3rem}.chn-setup-card{border-radius:17px}.chn-setup-options{flex-direction:column;align-items:stretch}}
