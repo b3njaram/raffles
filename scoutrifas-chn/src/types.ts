@@ -31,6 +31,7 @@ export interface TicketNumber {
 }
 export interface AdminReport {
  orders:TicketOrder[];tickets:TicketNumber[];confirmed:number;pending:number;totalTickets:number;
+ totalOrders:number;totalReference:number;memberCount:number;pendingMembers:number;supportersCount:number;
 }
 export const defaultDraft:Draft={
  title:'',description:'',category:'Aventura',end_at:'',ticket_price:50,max_entries:100,max_per_user:5

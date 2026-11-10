@@ -164,18 +164,32 @@ export const backend={
   if(userId)q=q.eq('user_id',userId);
   const r=await q;if(r.error)throw r.error;return (r.data||[]) as TicketNumber[];
  },
+ async allAdminOrders():Promise<TicketOrder[]>{
+  const s=requireCloud();
+  const result:TicketOrder[]=[];
+  for(let offset=0;offset<50000;offset+=1000){
+   const r=await s.from('chn_ticket_orders').select('*').order('created_at',{ascending:false}).range(offset,offset+999);
+   if(r.error)throw r.error;
+   const page=(r.data||[]) as TicketOrder[];
+   result.push(...page);
+   if(page.length<1000)return result;
+  }
+  throw new Error('El historial supera 50,000 solicitudes. Exporta desde Supabase por intervalos.');
+ },
  async adminOverview():Promise<AdminReport>{
   const s=requireCloud();
-  const [orders,tickets,totalOrders,totalTickets]=await Promise.all([
-   backend.orders(),backend.tickets(),
-   s.from('chn_ticket_orders').select('id',{count:'exact',head:true}),
-   s.from('chn_ticket_numbers').select('id',{count:'exact',head:true})
+  const [orders,tickets,metrics]=await Promise.all([
+   backend.orders(),backend.tickets(),s.rpc('chn_admin_metrics')
   ]);
-  if(totalOrders.error)throw totalOrders.error;
-  if(totalTickets.error)throw totalTickets.error;
-  return {orders,tickets,confirmed:orders.filter(o=>o.status==='confirmed').length,
-   pending:orders.filter(o=>o.status==='pending'&&new Date(o.expires_at)>new Date()).length,
-   totalTickets:totalTickets.count||0};
+  if(metrics.error)throw metrics.error;
+  if(!metrics.data)throw new Error('No se pudieron cargar las estadísticas.');
+  const m=metrics.data as Record<string,number>;
+  return {
+   orders,tickets,confirmed:Number(m.confirmed||0),pending:Number(m.pending||0),
+   totalTickets:Number(m.totalTickets||0),totalOrders:Number(m.totalOrders||0),
+   totalReference:Number(m.totalReference||0),memberCount:Number(m.memberCount||0),
+   pendingMembers:Number(m.pendingMembers||0),supportersCount:Number(m.supportersCount||0)
+  };
  },
  async members():Promise<Profile[]>{
   const r=await requireCloud().from('chn_profiles').select('*').order('created_at',{ascending:false}).limit(1000);
