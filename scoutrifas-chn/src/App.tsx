@@ -292,116 +292,90 @@ function ProfilePage({person,current,onSave,notify,listings,onOpen}:{person:Prof
  </section>;
 }
 function Admin({items,refresh,notify}:{items:Listing[];refresh:()=>Promise<void>;notify:(s:string,e?:boolean)=>void}){
- const [members,setMembers]=useState<Profile[]>([]),[applications,setApplications]=useState<AccessRequest[]>([]),[report,setReport]=useState<AdminReport>(emptyReport),[tab,setTab]=useState<'applications'|'raffles'|'orders'|'members'|'tickets'>('applications');
- const [busy,setBusy]=useState(''),[search,setSearch]=useState(''),[winning,setWinning]=useState<Record<string,string>>({}),[references,setReferences]=useState<Record<string,string>>({});
- const [updated,setUpdated]=useState<Date|null>(null);
- const reload=useCallback(async()=>{try{const [people,stats,requests]=await Promise.all([backend.members(),backend.adminOverview(),backend.accessRequests()]);setMembers(people);setReport(stats);setApplications(requests);setUpdated(new Date())}
- catch(err){notify(err instanceof Error?err.message:'Error en administración.',true)}},[notify]);
- useEffect(()=>{void reload();const interval=window.setInterval(()=>{void reload();void refresh().catch(()=>{})},15000);return()=>window.clearInterval(interval)},[reload,refresh]);
- const userNames=new Map(members.map(m=>[m.id,m])),listingNames=new Map(items.map(l=>[l.id,l]));
- const pending=items.filter(l=>l.status==='pending').length,query=search.trim().toLowerCase();
- const filter=(...bits:(string|number|null|undefined)[])=>!query||bits.join(' ').toLowerCase().includes(query);
- const handle=async(id:string,task:()=>Promise<unknown>,message:string)=>{setBusy(id);try{await task();await Promise.all([reload(),refresh()]);notify(message)}catch(err){notify(err instanceof Error?err.message:'No se pudo completar.',true)}finally{setBusy('')}};
- const review=(id:string,action:'active'|'paused'|'cancelled')=>void handle(id,()=>backend.reviewListing(id,action),'Publicación actualizada.');
- const verify=(id:string,state:boolean)=>void handle(id,()=>backend.reviewUser(id,state),'Miembro actualizado.');
- const reviewApplication=(r:AccessRequest,approved:boolean)=>void handle(r.id,()=>backend.reviewAccess(r.id,approved),approved?'Solicitud aprobada. Notifica a la persona para que cree su cuenta.':'Solicitud rechazada.');
- const reviewOrder=(o:TicketOrder,action:'confirmed'|'cancelled')=>{
-  if(action==='confirmed'&&!window.confirm('¿Confirmaste documentalmente la operación y verificaste que el sorteo tiene autorización vigente?'))return;
-  void handle(o.id,()=>backend.reviewOrder(o.id,action),action==='confirmed'?'Boletos y folios confirmados.':'Solicitud cancelada.');
+ const [members,setMembers]=useState<Profile[]>([]),[applications,setApplications]=useState<AccessRequest[]>([]);
+ const [entries,setEntries]=useState<FreeDrawEntry[]>([]),[pledges,setPledges]=useState<SupportIntent[]>([]);
+ const [tab,setTab]=useState<'applications'|'draws'|'support'|'entries'|'members'>('applications'),[search,setSearch]=useState('');
+ const [busy,setBusy]=useState(''),[updated,setUpdated]=useState<Date|null>(null);
+ const [numbers,setNumbers]=useState<Record<string,string>>({}),[references,setReferences]=useState<Record<string,string>>({});
+ const reload=useCallback(async()=>{
+  try{const [people,requests,drawEntries,support]=await Promise.all([backend.members(),backend.accessRequests(),backend.freeEntries(),backend.supportIntents()]);
+   setMembers(people);setApplications(requests);setEntries(drawEntries);setPledges(support);setUpdated(new Date());
+  }catch(err){notify(friendlyError(err),true)}
+ },[notify]);
+ useEffect(()=>{void reload();const t=window.setInterval(()=>{void reload();void refresh().catch(()=>{})},15000);return()=>window.clearInterval(t)},[reload,refresh]);
+ const names=new Map(members.map(m=>[m.id,m]));
+ const listings=new Map(items.map(l=>[l.id,l]));
+ const query=search.trim().toLowerCase();
+ const matches=(...parts:(string|number|null|undefined)[])=>!query||parts.join(' ').toLowerCase().includes(query);
+ const action=async(id:string,fn:()=>Promise<unknown>,msg:string)=>{setBusy(id);try{await fn();await Promise.all([reload(),refresh()]);notify(msg)}catch(err){notify(friendlyError(err),true)}finally{setBusy('')}};
+ const reviewAccess=(r:AccessRequest,approve:boolean)=>void action(r.id,()=>backend.reviewAccess(r.id,approve),approve?'Solicitud aprobada. Notifica a la persona para que complete su registro.':'Solicitud rechazada.');
+ const reviewDraw=(id:string,status:'active'|'paused'|'cancelled')=>void action(id,()=>backend.reviewListing(id,status),'Sorteo actualizado. La participación sigue sujeta a autorización de SEGOB.');
+ const verify=(id:string,value:boolean)=>void action(id,()=>backend.reviewUser(id,value),'Estado de usuario actualizado.');
+ const finish=(l:Listing)=>{
+  const entry=Number(numbers[l.id]),reference=references[l.id]||'';
+  if(!Number.isInteger(entry)||entry<1||reference.trim().length<8){notify('Ingresa un número confirmado y una referencia del acta.',true);return;}
+  if(!window.confirm('¿El resultado corresponde al sorteo oficial autorizado? Registrar es irreversible.'))return;
+  void action(l.id,()=>backend.recordFreeDraw(l.id,entry,reference),'Resultado oficial guardado.');
  };
- const draw=(l:Listing)=>{
-  const no=Number(winning[l.id]),reference=references[l.id]||'';
-  if(!Number.isInteger(no)||no<1||reference.trim().length<8){notify('Indica un folio confirmado y referencia del acta.',true);return;}
-  if(!window.confirm('¿El folio corresponde al sorteo oficial supervisado? El resultado será irreversible.'))return;
-  void handle(l.id,()=>backend.recordDraw(l.id,no,reference),'Resultado oficial registrado.');
- };
- const csv=async()=>{if(busy)return;setBusy('export');try{
-  const fullOrders=await backend.allAdminOrders();
+ const exportPledges=()=>{
   const cell=(v:unknown)=>'"'+String(v??'').replace(/"/g,'""').replace(/^[=+\-@]/,"'$&")+'"';
-  const rows=[['Fecha','Rifa','Participante','Tipo de cuenta','Cantidad','Precio unitario MXN','Total MXN','Estado'],
-   ...fullOrders.map(o=>[o.created_at,listingNames.get(o.listing_id)?.title||'',userNames.get(o.user_id)?.display_name||'',userNames.get(o.user_id)?.member_type||'',o.quantity,o.unit_price,o.total_price,o.status])];
-  const blob=new Blob([String.fromCharCode(65279)+rows.map(r=>r.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});
-  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='scoutrifas-boletos.csv';a.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
-  notify('Archivo CSV generado.');
- }catch(err){notify(friendlyError(err),true)}finally{setBusy('')}
+  const rows=[['Fecha','Usuario','Destino','Monto MXN','Estado'],...pledges.map(x=>[x.created_at,names.get(x.user_id)?.display_name||'',x.purpose,x.amount,'Solo intención'])];
+  const url=URL.createObjectURL(new Blob([String.fromCharCode(65279)+rows.map(r=>r.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));
+  const a=document.createElement('a');a.href=url;a.download='scoutapoya-intenciones.csv';a.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
  };
- const totalReference=report.totalReference;
  return <section className="admin-view">
-  <div className="section-title"><div><span className="kicker">CENTRO DE CONTROL</span><h2>Administración de rifas</h2><p>Folios, confirmaciones y avance de cada sorteo.</p></div><ShieldCheck size={38} className="admin-shield"/></div>
+  <div className="section-title"><div><span className="kicker">CONTROL COMUNITARIO</span><h2>Panel de administración</h2><p>Accesos, sorteos gratuitos y compromisos voluntarios de apoyo.</p></div><ShieldCheck size={38} className="admin-shield"/></div>
   <div className="stat-grid chn-stats">
-   <div className="stat"><Ticket/><b>{items.length}</b><span>Rifas creadas</span></div>
-   <div className="stat"><Clock3/><b>{pending}</b><span>Por revisar</span></div>
-   <div className="stat"><Users/><b>{report.pending}</b><span>Solicitudes pendientes</span></div>
-   <div className="stat"><CheckCircle2/><b>{report.totalTickets}</b><span>Folios emitidos</span></div>
-   <div className="stat"><Heart/><b>{report.supportersCount}</b><span>Simpatizantes aprobados</span></div>
-   <div className="stat"><Users/><b>{applications.filter(r=>r.status==='pending').length}</b><span>Solicitudes por aprobar</span></div>
-   <div className="stat"><BarChart3/><b>{money(totalReference)}</b><span>Valor de boletos confirmados*</span></div>
+   <div className="stat"><Users/><b>{applications.filter(r=>r.status==='pending').length}</b><span>Solicitudes por revisar</span></div>
+   <div className="stat"><Ticket/><b>{items.filter(l=>l.status==='pending').length}</b><span>Sorteos por revisar</span></div>
+   <div className="stat"><CheckCircle2/><b>{members.length}</b><span>Miembros</span></div>
+   <div className="stat"><Heart/><b>{pledges.length}</b><span>Intenciones de apoyo</span></div>
+   <div className="stat"><Users/><b>{entries.length}</b><span>Participaciones gratis*</span></div>
+   <div className="stat"><BarChart3/><b>{money(pledges.reduce((sum,p)=>sum+p.amount,0))}</b><span>Monto comprometido, NO cobrado</span></div>
   </div>
-  <div className="admin-toolbar"><small>Actualización cada 15 segundos{updated?' · '+updated.toLocaleTimeString('es-MX'):''}</small><button className="secondary" type="button" onClick={()=>{void reload();void refresh()}}>Actualizar</button></div>
-  <div className="admin-progress"><h3>Progreso de las rifas</h3>
-   {items.filter(l=>l.status!=='cancelled').map(l=><div className="progress-row" key={l.id}><div><b>{l.title}</b><small>{l.entry_count}/{l.max_entries} boletos · {money(l.ticket_price)} c/u · {l.sales_authorized?'Permiso registrado':'Venta no habilitada'}</small></div>
-    <div className="progress-track"><span style={{width:Math.min(100,100*l.entry_count/l.max_entries)+'%'}}/></div></div>)}
-   {!items.length&&<p className="empty-small">Todavía no hay rifas creadas.</p>}
-  </div>
+  <div className="admin-toolbar"><small>Actualización aproximada cada 15 segundos{updated?' · '+updated.toLocaleTimeString('es-MX'):''}</small><button className="secondary" onClick={()=>{void reload();void refresh()}}>Actualizar</button></div>
   <div className="tabs admin-tabs">
    <button className={tab==='applications'?'active':''} onClick={()=>setTab('applications')}>Accesos ({applications.filter(r=>r.status==='pending').length})</button>
-   <button className={tab==='raffles'?'active':''} onClick={()=>setTab('raffles')}>Rifas ({pending} pendientes)</button>
-   <button className={tab==='orders'?'active':''} onClick={()=>setTab('orders')}>Solicitudes ({report.pending})</button>
-   <button className={tab==='tickets'?'active':''} onClick={()=>setTab('tickets')}>Folios ({report.totalTickets})</button>
-   <button className={tab==='members'?'active':''} onClick={()=>setTab('members')}>Usuarios ({report.pendingMembers} pendientes)</button>
+   <button className={tab==='draws'?'active':''} onClick={()=>setTab('draws')}>Sorteos ({items.length})</button>
+   <button className={tab==='support'?'active':''} onClick={()=>setTab('support')}>Apoyos ({pledges.length})</button>
+   <button className={tab==='entries'?'active':''} onClick={()=>setTab('entries')}>Participantes ({entries.length})</button>
+   <button className={tab==='members'?'active':''} onClick={()=>setTab('members')}>Usuarios</button>
   </div>
-  <div className="admin-filter"><label className="search-field"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por rifa o persona" aria-label="Buscar en administración"/></label>
-   {tab==='orders'&&<button className="secondary" disabled={!!busy} onClick={()=>{void csv()}}>{busy==='export'?'Generando…':'Exportar todas las solicitudes (CSV)'}</button>}</div>
-  {tab==='applications'&&<div className="admin-list">{applications.filter(r=>!query||filter(r.display_name,r.email,r.scout_id,r.member_type,r.status)).map(r=><div className="admin-line chn-application-row" key={r.id}>
-   <div className="history-symbol"><Users size={21}/></div>
-   <div className="grow"><b>{r.display_name}</b>
-    <p>{r.email} · {r.member_type==='scout'?'Scout':'Simpatizante'}{r.scout_id?' · '+r.scout_id:''}</p>
-    <small>{r.group_name||r.referral_note||'Sin referencia'} · Solicitud: {new Date(r.created_at).toLocaleDateString('es-MX')}</small>
-    <div className="mini-metrics">{r.status==='pending'?'Pendiente':r.status==='approved'?'Aprobado, falta registro':r.status==='consumed'?'Cuenta registrada':'Rechazado'}</div>
-   </div>
-   <div className="admin-actions">
-    {r.status==='pending'&&<>
-     <button type="button" className="small-approve" disabled={!!busy} onClick={()=>reviewApplication(r,true)}><Check size={15}/> Aprobar</button>
-     <button type="button" className="danger" disabled={!!busy} onClick={()=>reviewApplication(r,false)}>Rechazar</button>
-    </>}
-    {r.status==='approved'&&<a className="chn-email-link" href={'mailto:'+r.email+'?subject='+encodeURIComponent('Tu solicitud a ScoutRifas CHN fue aprobada')+'&body='+encodeURIComponent('Tu solicitud fue aprobada. Entra a https://scoutrifas-chn.vercel.app y selecciona Crear cuenta aprobada, usando el mismo correo. Si ya tenías una cuenta de Supabase, inicia sesión y elige Activar acceso aprobado.')}>Avisar por correo</a>}
-   </div>
-  </div>)}{!applications.length&&<p className="empty-small">Aún no hay solicitudes de acceso. Aparecerán aquí antes de que alguien pueda crear una cuenta ScoutRifas.</p>}</div>}
-  {tab==='raffles'&&<div className="admin-list">{items.filter(l=>filter(l.title,l.owner?.display_name,l.status)).map(l=><div className="admin-line" key={l.id}>
-   <img src={imageUrl(l.image_paths[0])||sampleHero} alt=""/>
-   <div className="grow"><b>{l.title}</b><p>{l.owner?.display_name||'Organizador'} · Precio: {money(l.ticket_price)} · {new Date(l.end_at).toLocaleDateString('es-MX')}</p>
-    <Status status={l.status}/><div className="mini-metrics">{l.entry_count}/{l.max_entries} folios · {l.sales_authorized?'Habilitada':'Venta pendiente de autorización'}</div>
-    {l.permit_number&&<small>Permiso: {l.permit_number}</small>}
-    {l.status==='active'&&new Date(l.end_at)<=new Date()&&l.sales_authorized&&<div className="chn-draw-fields">
-     <label>Folio ganador<input type="number" min={1} value={winning[l.id]||''} onChange={e=>setWinning(v=>({...v,[l.id]:e.target.value}))}/></label>
-     <label>Referencia del acta<input value={references[l.id]||''} onChange={e=>setReferences(v=>({...v,[l.id]:e.target.value}))}/></label>
-     <button className="small-approve" disabled={!!busy} onClick={()=>draw(l)}>Registrar resultado</button></div>}
-   </div>
-   <div className="admin-actions">
-    {(l.status==='pending'||l.status==='paused')&&<button className="small-approve" disabled={!!busy} onClick={()=>review(l.id,'active')}><Check size={15}/> Aprobar</button>}
-    {l.status==='active'&&<button disabled={!!busy} onClick={()=>review(l.id,'paused')}>Pausar</button>}
-    {['pending','active','paused'].includes(l.status)&&<button className="danger" disabled={!!busy} onClick={()=>review(l.id,'cancelled')}>Cancelar</button>}
-   </div></div>)}{!items.length&&<p className="empty-small">Sin publicaciones por ahora.</p>}</div>}
-  {tab==='orders'&&<div className="admin-list">{report.orders.filter(o=>filter(listingNames.get(o.listing_id)?.title,userNames.get(o.user_id)?.display_name,o.status)).map(o=><div className="admin-line chn-history" key={o.id}>
-   <span className="history-symbol"><Ticket size={21}/></span>
-   <div className="grow"><b>{listingNames.get(o.listing_id)?.title||'Rifa'}</b>
-    <p>{userNames.get(o.user_id)?.display_name||'Participante'} · {userNames.get(o.user_id)?.member_type==='supporter'?'Simpatizante':'Scout'} · {new Date(o.created_at).toLocaleString('es-MX')}</p>
-    <small>{o.quantity} boletos × {money(o.unit_price)} · {new Date(o.expires_at)<new Date()&&o.status==='pending'?'Vencida':o.status}</small>
-   </div>
-   <div className="admin-actions"><b>{money(o.total_price)}</b>{o.status==='pending'&&new Date(o.expires_at)>new Date()&&<>
-    <button className="small-approve" disabled={!!busy} onClick={()=>reviewOrder(o,'confirmed')}>Confirmar</button>
-    <button className="danger" disabled={!!busy} onClick={()=>reviewOrder(o,'cancelled')}>Rechazar</button></>}</div></div>)}
-    {!report.orders.length&&<p className="empty-small">Sin solicitudes de boletos.</p>}{report.totalOrders>report.orders.length&&<p className="empty-small">Mostrando las últimas {report.orders.length} solicitudes de {report.totalOrders}. El CSV incluye el historial completo.</p>}</div>}
-  {tab==='tickets'&&<div className="admin-list">{report.tickets.filter(t=>filter(listingNames.get(t.listing_id)?.title,userNames.get(t.user_id)?.display_name,t.ticket_no)).map(t=><div className="admin-line chn-history" key={t.id}>
-   <span className="history-symbol"><Ticket size={21}/></span><div className="grow"><b>{listingNames.get(t.listing_id)?.title||'Rifa'}</b><p>{userNames.get(t.user_id)?.display_name||'Participante'} · {new Date(t.issued_at).toLocaleString('es-MX')}</p></div>
-   <strong className="history-amount">Folio #{String(t.ticket_no).padStart(4,'0')}</strong></div>)}
-   {!report.tickets.length&&<p className="empty-small">Aún no se han emitido folios.</p>}</div>}
-  {tab==='members'&&<div className="admin-list">{members.filter(m=>filter(m.display_name,m.scout_id,m.member_type)).map(m=><div className="admin-line user-line" key={m.id}>
-   <Avatar user={m} size={48}/><div className="grow"><b>{m.display_name}</b><p>{m.member_type==='supporter'?'Simpatizante':m.scout_id} · {m.referral_note||m.group_name||'Sin referencia'}</p>
-    {m.role==='admin'&&<span className="verified">Administrador</span>}</div>
-   <div className="admin-actions">{m.verified?<span className="verified">Verificado</span>:<span className="pending">Por aprobar</span>}
-    {m.role!=='admin'&&<button disabled={!!busy} className={m.verified?'danger':'small-approve'} onClick={()=>verify(m.id,!m.verified)}>{m.verified?'Revocar':'Aprobar'}</button>}</div></div>)}</div>}
-  <p className="detail-disclaimer">*Valor de referencia de folios confirmados; no implica ingresos cobrados por la plataforma. Ninguna venta puede habilitarse antes de verificar un permiso válido, bases y documentación.</p>
+  <div className="admin-filter"><label className="search-field"><Search size={18}/><input aria-label="Buscar en administración" placeholder="Buscar nombre, correo o sorteo" value={search} onChange={e=>setSearch(e.target.value)}/></label>
+   {tab==='support'&&<button className="secondary" type="button" onClick={exportPledges}>Exportar CSV</button>}</div>
+  {tab==='applications'&&<div className="admin-list">{applications.filter(r=>matches(r.display_name,r.email,r.scout_id,r.status)).map(r=><div className="admin-line" key={r.id}>
+   <div className="history-symbol"><Users size={22}/></div><div className="grow"><b>{r.display_name}</b><p>{r.email} · {r.member_type==='scout'?'Scout':'Simpatizante'} · {r.scout_id||r.referral_note||'Sin referencia'}</p>
+    <small>{new Date(r.created_at).toLocaleDateString('es-MX')} · {r.status}</small></div>
+   <div className="admin-actions">{r.status==='pending'&&<><button className="small-approve" disabled={!!busy} onClick={()=>reviewAccess(r,true)}>Aprobar</button><button className="danger" disabled={!!busy} onClick={()=>reviewAccess(r,false)}>Rechazar</button></>}
+    {r.status==='approved'&&<a className="chn-email-link" href={'mailto:'+r.email+'?subject='+encodeURIComponent('ScoutApoya CHN: acceso aprobado')+'&body='+encodeURIComponent('Tu acceso fue aprobado. Visita https://scoutrifas-chn.vercel.app para registrar tu cuenta usando este correo.')}>Preparar aviso</a>}</div>
+   </div>)}{!applications.length&&<p className="empty-small">Todavía no hay solicitudes de acceso.</p>}</div>}
+  {tab==='draws'&&<div className="admin-list">{items.filter(l=>matches(l.title,l.status,l.owner?.display_name)).map(l=><div className="admin-line" key={l.id}>
+    <img src={imageUrl(l.image_paths[0])||sampleHero} alt=""/>
+    <div className="grow"><b>{l.title}</b><p>{l.owner?.display_name||'Organizador'} · Termina {new Date(l.end_at).toLocaleString('es-MX')}</p>
+     <Status status={l.status}/><div className="mini-metrics">{l.free_entry_count} de {l.max_entries} participaciones · {l.free_entry_authorized?'Autorización registrada':'Participación bloqueada'}</div>
+     {l.status==='active'&&new Date(l.end_at).getTime()<=Date.now()&&l.free_entry_authorized&&<div className="chn-draw-fields">
+      <label>Número ganador<input type="number" min={1} value={numbers[l.id]||''} onChange={e=>setNumbers(v=>({...v,[l.id]:e.target.value}))}/></label>
+      <label>Acta oficial<input value={references[l.id]||''} onChange={e=>setReferences(v=>({...v,[l.id]:e.target.value}))}/></label>
+      <button className="small-approve" disabled={!!busy} onClick={()=>finish(l)}>Registrar resultado oficial</button></div>}
+    </div><div className="admin-actions">
+     {(l.status==='pending'||l.status==='paused')&&<button className="small-approve" disabled={!!busy} onClick={()=>reviewDraw(l.id,'active')}>Publicar</button>}
+     {l.status==='active'&&<button disabled={!!busy} onClick={()=>reviewDraw(l.id,'paused')}>Pausar</button>}
+     {['active','pending','paused'].includes(l.status)&&<button className="danger" disabled={!!busy} onClick={()=>reviewDraw(l.id,'cancelled')}>Cancelar</button>}
+    </div></div>)}{!items.length&&<p className="empty-small">No hay sorteos creados.</p>}</div>}
+  {tab==='support'&&<div className="admin-list">{pledges.filter(p=>matches(p.purpose,p.note,names.get(p.user_id)?.display_name)).map(p=><div className="admin-line chn-history" key={p.id}>
+    <div className="history-symbol"><Heart size={20}/></div><div className="grow"><b>{names.get(p.user_id)?.display_name||'Miembro'}</b><p>Destino: {p.purpose} · {new Date(p.created_at).toLocaleString('es-MX')}</p>{p.note&&<small>{p.note}</small>}</div>
+    <strong className="history-amount">{money(p.amount)}<small style={{display:'block',fontWeight:400,fontSize:11}}>No cobrado</small></strong>
+  </div>)}{!pledges.length&&<p className="empty-small">Aún no se han registrado intenciones de apoyo.</p>}</div>}
+  {tab==='entries'&&<div className="admin-list">{entries.filter(e=>matches(listings.get(e.listing_id)?.title,names.get(e.user_id)?.display_name,e.entry_no)).map(e=><div className="admin-line chn-history" key={e.id}>
+   <div className="history-symbol"><Ticket size={20}/></div><div className="grow"><b>{listings.get(e.listing_id)?.title||'Sorteo'}</b><p>{names.get(e.user_id)?.display_name||'Miembro'} · {new Date(e.created_at).toLocaleString('es-MX')}</p></div>
+   <strong className="history-amount">#{String(e.entry_no).padStart(4,'0')}</strong>
+   </div>)}{!entries.length&&<p className="empty-small">No hay participaciones gratuitas todavía.</p>}</div>}
+  {tab==='members'&&<div className="admin-list">{members.filter(m=>matches(m.display_name,m.scout_id,m.member_type)).map(m=><div className="admin-line user-line" key={m.id}>
+    <Avatar user={m} size={48}/><div className="grow"><b>{m.display_name}</b><p>{m.member_type==='supporter'?'Simpatizante':m.scout_id} · {m.group_name}</p></div>
+    <div className="admin-actions">{m.role==='admin'?<span className="verified">Administrador único</span>:
+     <button disabled={!!busy} className={m.verified?'danger':'small-approve'} onClick={()=>verify(m.id,!m.verified)}>{m.verified?'Revocar acceso':'Aprobar acceso'}</button>}</div>
+    </div>)}</div>}
+  <p className="detail-disclaimer">*Resumen de los últimos 1,000 registros. Los montos son intenciones de apoyo, NO dinero recaudado. Aprobación de publicación no equivale a permiso para celebrar sorteos; el acceso a sorteos sigue bloqueado hasta tener autorización aplicable.</p>
  </section>;
 }
 export default function App(){
