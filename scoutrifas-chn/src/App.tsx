@@ -545,7 +545,7 @@ export default function App(){
   {application&&<Modal onClose={()=>setApplication(false)}><AccessApplication onClose={()=>setApplication(false)} notify={notify} onRegister={openApprovedRegistration}/></Modal>}
   {passwordRecovery&&<Modal onClose={()=>setPasswordRecovery(false)}><PasswordRecovery onClose={()=>setPasswordRecovery(false)} notify={notify}/></Modal>}
   {auth&&<Modal onClose={()=>setAuth(null)}><Authentication mode={auth} setMode={setAuth} onClose={()=>setAuth(null)} onSuccess={async()=>{setupDismissed.current=false;await refreshUser()}} notify={notify} onApply={openApplication}/></Modal>}
-  {creating&&viewer&&<Modal width="680px" onClose={()=>setCreating(false)}><CreateListing user={viewer} onClose={()=>setCreating(false)} done={refresh} notify={notify}/></Modal>}
+  {creating&&viewer&&<Modal width="850px" onClose={()=>setCreating(false)}><CreateListing user={viewer} onClose={()=>setCreating(false)} done={refresh} notify={notify}/></Modal>}
   {selected&&access&&<Modal width="880px" onClose={()=>setSelected(null)}><Detail item={selected} user={viewer} onClose={()=>setSelected(null)} onLogin={()=>setAuth('signup')} refresh={refresh} notify={notify} onProfile={viewProfile}/></Modal>}
  </>;
 }

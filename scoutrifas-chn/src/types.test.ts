@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {canPublish,canRequestTickets,canViewCatalogue,defaultDraft,isScoutId,money,salesReady} from './types';
+import {canPublish,canRequestTickets,canViewCatalogue,defaultDraft,isScoutId,money,salesReady,calculateRaffle,defaultRafflePlan} from './types';
 import type {Listing,Profile} from './types';
 const scout:Profile={id:'a',scout_id:'CHN-000123',member_type:'scout',adult_attested:true,display_name:'Test Scout',group_name:'',bio:'',avatar_path:null,role:'member',verified:true,created_at:''};
 const supporter:Profile={...scout,member_type:'supporter',scout_id:null,role:'member'};
@@ -11,4 +11,20 @@ describe('perfiles y participación',()=>{
  it('solo permite publicar a scouts aprobados',()=>{expect(canPublish(scout)).toBe(true);expect(defaultDraft.ticket_price).toBe(50)});
  it('sin autorización de venta no hay solicitudes',()=>{expect(salesReady(listing)).toBe(false);expect(salesReady({...listing,sales_authorized:true,permit_number:'SEGOB-2026',permit_expires_at:new Date(Date.now()+86400000).toISOString(),official_rules_url:'https://ejemplo.mx/bases'})).toBe(true)});
  it('muestra monto MXN',()=>{expect(money(150)).toContain('150')});
+});
+
+describe('calculadora de rifas',()=>{
+ it('calcula ingreso bruto, comisión y ganancia neta al 100%',()=>{
+  const c=calculateRaffle(50,100,{prizeCost:1000,otherCosts:250,profitGoal:3000,feePct:10});
+  expect(c.revenue).toBe(5000);expect(c.fees).toBe(500);
+  expect(c.profit).toBe(3250);expect(c.breakEven).toBe(28);
+  expect(c.goalMet).toBe(true);expect(c.goalTickets).toBe(95);
+ });
+ it('detecta meta inalcanzable y respeta comisión cero por defecto',()=>{
+  expect(defaultRafflePlan.feePct).toBe(0);
+  const c=calculateRaffle(20,10,{prizeCost:800,otherCosts:0,profitGoal:300,feePct:0});
+  expect(c.profit).toBe(-600);
+  expect(c.goalMet).toBe(false);
+  expect(c.goalTickets).toBe(55);
+ });
 });

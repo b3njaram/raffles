@@ -125,3 +125,37 @@ main{min-height:65vh}.hero-shell{max-width:1230px;padding:0 20px;margin:22px aut
 
 .chn-forgot-button{border:0;background:transparent;color:#654588;font-weight:700;cursor:pointer;margin-top:12px;padding:6px 0;text-decoration:underline;text-underline-offset:3px}
 .chn-forgot-button:disabled{opacity:.65;cursor:not-allowed}
+
+/* ScoutRifas CHN • planificación de boletos, hasta 10 fotos, aprobación previa */
+.chn-profit-planner{background:linear-gradient(165deg,#fbf9fe,#f5edf9);border:1px solid #e7dbea;border-radius:20px;padding:22px 20px;margin:10px 0 15px}
+.chn-planner-title{display:flex;align-items:flex-start;gap:12px;margin-bottom:17px}
+.chn-planner-title h3{font-size:19px;font-weight:850;margin:2px 0 5px;letter-spacing:-.025em;color:#493163}
+.chn-planner-title p{color:#766781;font-size:.83rem;line-height:1.5;margin:0}
+.chn-planner-icon{height:42px;width:42px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#e9ddf1;border-radius:14px;font-size:22px}
+.chn-profit-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin:16px 0}
+.chn-profit-grid>div{background:#fff;border-radius:13px;border:1px solid #eee6f1;padding:15px;min-width:0}
+.chn-profit-grid small{display:block;font-size:.73rem;color:#7c6c8b;line-height:1.45}
+.chn-profit-grid strong{display:block;font-size:clamp(1.05rem,2vw,1.5rem);font-weight:850;margin-top:6px;overflow-wrap:anywhere;color:#47335b}
+.chn-profit-grid .chn-value-positive{color:#1f7951}
+.chn-profit-grid .chn-value-negative{color:#ab3d4b}
+.chn-target-progress{padding:8px 2px 3px}
+.chn-target-track{width:100%;height:12px;border-radius:999px;background:#e5dceb;overflow:hidden}
+.chn-target-track span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#69518e,#19946b);transition:width .2s}
+.chn-target-progress p{font-size:.83rem;line-height:1.6;margin:9px 0 0;color:#5d4c69}
+.chn-target-progress .chn-planner-warning{color:#9f4b26;font-weight:650}
+.chn-planner-legal{display:block;font-size:.72rem;line-height:1.5;color:#786885;margin-top:13px}
+.chn-upload-previews{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px;margin:-1px 0 16px}
+.chn-preview{aspect-ratio:1/1;position:relative;overflow:hidden;border-radius:11px;background:#ece4f1;border:1px solid #e0d8e6}
+.chn-preview img{width:100%;height:100%;object-fit:cover}
+.chn-preview button{position:absolute;top:5px;right:5px;display:grid;place-items:center;background:#251b2fcc;color:white;border:0;border-radius:50%;width:26px;height:26px;cursor:pointer}
+.chn-preview button:hover{background:#9f3651}
+.chn-preview span{position:absolute;bottom:4px;left:5px;color:white;background:#301e4099;padding:2px 6px;border-radius:5px;font-size:.7rem;font-weight:800}
+.chn-honeypot{position:absolute!important;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;opacity:0;pointer-events:none}
+.chn-request-done{text-align:center;padding:20px 4px}
+.chn-request-done>svg{color:#26865d;margin:0 auto 12px}
+.chn-request-done h2{margin:0 0 12px}
+.chn-request-done p{color:#6d5b7b;font-size:.92rem;line-height:1.6;margin-bottom:20px}
+.chn-email-link{font-size:.8rem;color:#633e82;font-weight:750;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
+.chn-application-row .admin-actions{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.chn-create-modal{padding:30px 28px}
+@media(max-width:650px){.chn-upload-previews{grid-template-columns:repeat(3,minmax(0,1fr))}.chn-profit-grid{gap:8px}.chn-profit-grid>div{padding:12px}.chn-profit-planner{padding:15px 12px}.chn-create-modal{padding:24px 18px}.chn-application-row .admin-actions{align-items:stretch}}
