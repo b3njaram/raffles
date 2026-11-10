@@ -68,6 +68,17 @@ export const backend={
   const r=await requireCloud().auth.signInWithPassword({email,password});if(r.error)throw r.error;
    if(!r.data.session?.access_token)throw new Error('La sesión no quedó activa. Confirma tu correo e inténtalo nuevamente.');
  },
+ async sendPasswordReset(email:string):Promise<void>{
+  const s=requireCloud();
+  if(!email.trim()||!email.includes('@'))throw new Error('Escribe tu correo antes de recuperar tu contraseña.');
+  const r=await s.auth.resetPasswordForEmail(email.trim(),{redirectTo:window.location.origin});
+  if(r.error)throw r.error;
+ },
+ async changePassword(password:string):Promise<void>{
+  const s=requireCloud();
+  if(password.length<10)throw new Error('Usa una contraseña de al menos 10 caracteres.');
+  const r=await s.auth.updateUser({password});if(r.error)throw r.error;
+ },
  async logout(){
   signedPhotos.clear();
   const r=await requireCloud().auth.signOut();if(r.error)throw r.error;
