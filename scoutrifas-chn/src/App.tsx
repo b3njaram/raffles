@@ -10,7 +10,7 @@ type Screen='explore'|'setup'|'mine'|'activity'|'profile'|'admin';
 type AuthMode='login'|'signup';
 const sampleHero='https://images.unsplash.com/photo-1500534623283-312aade485b7?w=1600&q=80';
 const categoryIcons:Record<Category,string>={Aventura:'⛺',Equipo:'🎒',Coleccionables:'🏅',Experiencias:'🏕️',Arte:'🎨',Otros:'✨'};
-const emptyReport:AdminReport={orders:[],tickets:[],confirmed:0,pending:0,totalTickets:0};
+const emptyReport:AdminReport={orders:[],tickets:[],confirmed:0,pending:0,totalTickets:0,totalOrders:0,totalReference:0,memberCount:0,pendingMembers:0,supportersCount:0};
 function Fleur({size=30}:{size?:number}){return <span className="fleur" style={{fontSize:size}} aria-hidden="true">⚜</span>}
 function Avatar({user,size=38}:{user?:Profile|null;size?:number}){
  const src=imageUrl(user?.avatar_path),letters=(user?.display_name||'?').split(' ').slice(0,2).map(x=>x[0]).join('').toUpperCase();
@@ -256,14 +256,17 @@ function Admin({items,refresh,notify}:{items:Listing[];refresh:()=>Promise<void>
   if(!window.confirm('¿El folio corresponde al sorteo oficial supervisado? El resultado será irreversible.'))return;
   void handle(l.id,()=>backend.recordDraw(l.id,no,reference),'Resultado oficial registrado.');
  };
- const csv=()=>{
+ const csv=async()=>{if(busy)return;setBusy('export');try{
+  const fullOrders=await backend.allAdminOrders();
   const cell=(v:unknown)=>'"'+String(v??'').replace(/"/g,'""').replace(/^[=+\-@]/,"'$&")+'"';
   const rows=[['Fecha','Rifa','Participante','Tipo de cuenta','Cantidad','Precio unitario MXN','Total MXN','Estado'],
-   ...report.orders.map(o=>[o.created_at,listingNames.get(o.listing_id)?.title||'',userNames.get(o.user_id)?.display_name||'',userNames.get(o.user_id)?.member_type||'',o.quantity,o.unit_price,o.total_price,o.status])];
+   ...fullOrders.map(o=>[o.created_at,listingNames.get(o.listing_id)?.title||'',userNames.get(o.user_id)?.display_name||'',userNames.get(o.user_id)?.member_type||'',o.quantity,o.unit_price,o.total_price,o.status])];
   const blob=new Blob([String.fromCharCode(65279)+rows.map(r=>r.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='scoutrifas-boletos.csv';a.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+  notify('Archivo CSV generado.');
+ }catch(err){notify(friendlyError(err),true)}finally{setBusy('')}
  };
- const totalReference=report.orders.filter(o=>o.status==='confirmed').reduce((sum,o)=>sum+o.total_price,0);
+ const totalReference=report.totalReference;
  return <section className="admin-view">
   <div className="section-title"><div><span className="kicker">CENTRO DE CONTROL</span><h2>Administración de rifas</h2><p>Folios, confirmaciones y avance de cada sorteo.</p></div><ShieldCheck size={38} className="admin-shield"/></div>
   <div className="stat-grid chn-stats">
@@ -271,7 +274,7 @@ function Admin({items,refresh,notify}:{items:Listing[];refresh:()=>Promise<void>
    <div className="stat"><Clock3/><b>{pending}</b><span>Por revisar</span></div>
    <div className="stat"><Users/><b>{report.pending}</b><span>Solicitudes pendientes</span></div>
    <div className="stat"><CheckCircle2/><b>{report.totalTickets}</b><span>Folios emitidos</span></div>
-   <div className="stat"><Heart/><b>{members.filter(m=>m.member_type==='supporter'&&m.verified).length}</b><span>Simpatizantes aprobados</span></div>
+   <div className="stat"><Heart/><b>{report.supportersCount}</b><span>Simpatizantes aprobados</span></div>
    <div className="stat"><BarChart3/><b>{money(totalReference)}</b><span>Valor de boletos confirmados*</span></div>
   </div>
   <div className="admin-toolbar"><small>Actualización cada 15 segundos{updated?' · '+updated.toLocaleTimeString('es-MX'):''}</small><button className="secondary" type="button" onClick={()=>{void reload();void refresh()}}>Actualizar</button></div>
@@ -284,10 +287,10 @@ function Admin({items,refresh,notify}:{items:Listing[];refresh:()=>Promise<void>
    <button className={tab==='raffles'?'active':''} onClick={()=>setTab('raffles')}>Rifas ({pending} pendientes)</button>
    <button className={tab==='orders'?'active':''} onClick={()=>setTab('orders')}>Solicitudes ({report.pending})</button>
    <button className={tab==='tickets'?'active':''} onClick={()=>setTab('tickets')}>Folios ({report.totalTickets})</button>
-   <button className={tab==='members'?'active':''} onClick={()=>setTab('members')}>Usuarios ({members.filter(m=>!m.verified).length} pendientes)</button>
+   <button className={tab==='members'?'active':''} onClick={()=>setTab('members')}>Usuarios ({report.pendingMembers} pendientes)</button>
   </div>
   <div className="admin-filter"><label className="search-field"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por rifa o persona" aria-label="Buscar en administración"/></label>
-   {tab==='orders'&&<button className="secondary" onClick={csv}>Exportar CSV</button>}</div>
+   {tab==='orders'&&<button className="secondary" disabled={!!busy} onClick={()=>{void csv()}}>{busy==='export'?'Generando…':'Exportar todas las solicitudes (CSV)'}</button>}</div>
   {tab==='raffles'&&<div className="admin-list">{items.filter(l=>filter(l.title,l.owner?.display_name,l.status)).map(l=><div className="admin-line" key={l.id}>
    <img src={imageUrl(l.image_paths[0])||sampleHero} alt=""/>
    <div className="grow"><b>{l.title}</b><p>{l.owner?.display_name||'Organizador'} · Precio: {money(l.ticket_price)} · {new Date(l.end_at).toLocaleDateString('es-MX')}</p>
@@ -312,7 +315,7 @@ function Admin({items,refresh,notify}:{items:Listing[];refresh:()=>Promise<void>
    <div className="admin-actions"><b>{money(o.total_price)}</b>{o.status==='pending'&&new Date(o.expires_at)>new Date()&&<>
     <button className="small-approve" disabled={!!busy} onClick={()=>reviewOrder(o,'confirmed')}>Confirmar</button>
     <button className="danger" disabled={!!busy} onClick={()=>reviewOrder(o,'cancelled')}>Rechazar</button></>}</div></div>)}
-    {!report.orders.length&&<p className="empty-small">Sin solicitudes de boletos.</p>}</div>}
+    {!report.orders.length&&<p className="empty-small">Sin solicitudes de boletos.</p>}{report.totalOrders>report.orders.length&&<p className="empty-small">Mostrando las últimas {report.orders.length} solicitudes de {report.totalOrders}. El CSV incluye el historial completo.</p>}</div>}
   {tab==='tickets'&&<div className="admin-list">{report.tickets.filter(t=>filter(listingNames.get(t.listing_id)?.title,userNames.get(t.user_id)?.display_name,t.ticket_no)).map(t=><div className="admin-line chn-history" key={t.id}>
    <span className="history-symbol"><Ticket size={21}/></span><div className="grow"><b>{listingNames.get(t.listing_id)?.title||'Rifa'}</b><p>{userNames.get(t.user_id)?.display_name||'Participante'} · {new Date(t.issued_at).toLocaleString('es-MX')}</p></div>
    <strong className="history-amount">Folio #{String(t.ticket_no).padStart(4,'0')}</strong></div>)}
