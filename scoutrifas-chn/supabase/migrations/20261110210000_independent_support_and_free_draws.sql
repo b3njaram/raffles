@@ -7,7 +7,7 @@ revoke execute on function public.chn_request_tickets(uuid,integer),
  from authenticated;
 revoke execute on function private.chn_request_tickets_impl(uuid,integer),
  private.chn_review_ticket_order_impl(uuid,text),
- private.chn_record_ticket_draw_impl(uuid,integer)
+ private.chn_record_ticket_draw_impl(uuid,integer,text)
  from authenticated;
 update public.chn_listings set sales_authorized=false where sales_authorized=true;
 alter table public.chn_listings
