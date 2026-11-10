@@ -3,7 +3,7 @@ import {canPublish,canRequestTickets,canViewCatalogue,defaultDraft,isScoutId,mon
 import type {Listing,Profile} from './types';
 const scout:Profile={id:'a',scout_id:'CHN-000123',member_type:'scout',adult_attested:true,display_name:'Test Scout',group_name:'',bio:'',avatar_path:null,role:'member',verified:true,created_at:''};
 const supporter:Profile={...scout,member_type:'supporter',scout_id:null,role:'member'};
-const listing:Listing={id:'a',owner_id:'a',title:'Rifa',description:'Descripción',type:'raffle',category:'Otros',image_paths:[],status:'active',end_at:new Date(Date.now()+86400000).toISOString(),min_bid:0,bid_step:1,current_bid:0,entry_count:0,bid_count:0,max_entries:100,max_per_user:5,winner_id:null,created_at:'',ticket_price:50,sales_authorized:false,permit_number:null,permit_expires_at:null,official_rules_url:null,winning_ticket_no:null};
+const listing:Listing={id:'a',owner_id:'a',title:'Rifa',description:'Descripción',type:'raffle',category:'Otros',image_paths:[],status:'active',end_at:new Date(Date.now()+86400000).toISOString(),min_bid:0,bid_step:1,current_bid:0,entry_count:0,bid_count:0,max_entries:100,max_per_user:5,winner_id:null,created_at:'',ticket_price:50,sales_authorized:false,free_entry_authorized:false,free_entry_count:0,permit_number:null,permit_expires_at:null,official_rules_url:null,winning_ticket_no:null};
 describe('perfiles y participación',()=>{
  it('acepta solamente IDs CHN válidos',()=>{expect(isScoutId('CHN-000123')).toBe(true);expect(isScoutId('ABC-000123')).toBe(false)});
  it('permite simpatizantes aprobados sin ID scout',()=>{expect(canViewCatalogue(supporter)).toBe(true);expect(canPublish(supporter)).toBe(false)});

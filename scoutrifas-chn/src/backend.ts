@@ -1,6 +1,6 @@
 import {createClient} from '@supabase/supabase-js';
 import type {AccessRequest,AdminReport,Category,Draft,FreeDrawEntry,Listing,MemberType,Profile,RafflePlan,SupportIntent,SupportPurpose,TicketNumber,TicketOrder} from './types';
-import {canPublish,canRequestTickets,canViewCatalogue,isScoutId,salesReady} from './types';
+import {canPublish,canViewCatalogue,isScoutId} from './types';
 
 const url=import.meta.env.VITE_SUPABASE_URL;
 const key=import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;

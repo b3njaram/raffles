@@ -66,7 +66,7 @@ function Authentication({mode,setMode,onClose,onSuccess,notify,onApply}:{mode:Au
   }catch(err){notify(friendlyError(err),true)}finally{setBusy(false)}
  };
  return <div className="auth-content">
-  <div className="modal-brand"><span className="brand-icon"><Fleur size={25}/></span><span>SCOUT<span className="brand-strong">RIFAS</span> <sup>CHN</sup></span></div>
+  <div className="modal-brand"><span className="brand-icon"><Fleur size={25}/></span><span>SCOUT<span className="brand-strong">APOYA</span> <sup>CHN</sup></span></div>
   <h2>{mode==='signup'?'Crear cuenta aprobada':'Bienvenido de vuelta'}</h2>
   <p className="subtle">{mode==='signup'?'Utiliza el mismo correo y tipo de miembro que autorizó administración.':'Inicia sesión para ver las actividades.'}</p>
   <div className="switcher"><button type="button" className={mode==='login'?'selected':''} onClick={()=>setMode('login')}>Iniciar sesión</button><button type="button" className={mode==='signup'?'selected':''} onClick={()=>setMode('signup')}>Crear cuenta</button></div>
@@ -81,7 +81,7 @@ function Authentication({mode,setMode,onClose,onSuccess,notify,onApply}:{mode:Au
    </>}
    <label>Correo electrónico<input required type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="tu@correo.com"/></label>
    <label>Contraseña<input required minLength={8} type="password" autoComplete={mode==='signup'?'new-password':'current-password'} value={password} onChange={e=>setPassword(e.target.value)}/></label>
-   <button className="primary full" type="submit" disabled={busy}>{busy?'Procesando…':mode==='signup'?'Crear mi cuenta':'Entrar a ScoutRifas'}<ArrowRight size={17}/></button>
+   <button className="primary full" type="submit" disabled={busy}>{busy?'Procesando…':mode==='signup'?'Crear mi cuenta':'Entrar a ScoutApoya'}<ArrowRight size={17}/></button>
   </form>
   {mode==='login'&&<button className="chn-forgot-button" type="button" disabled={busy} onClick={async()=>{
     try{setBusy(true);await backend.sendPasswordReset(email);notify('Si el correo está registrado, recibirás un enlace para restablecer tu contraseña.');onClose();}
@@ -103,7 +103,7 @@ function AccessApplication({onClose,notify,onRegister}:{onClose:()=>void;notify:
   finally{setBusy(false)}
  };
  return <div className="auth-content">
-  <div className="modal-brand"><span className="brand-icon"><Fleur size={25}/></span><span>SCOUT<span className="brand-strong">RIFAS</span> <sup>CHN</sup></span></div>
+  <div className="modal-brand"><span className="brand-icon"><Fleur size={25}/></span><span>SCOUT<span className="brand-strong">APOYA</span> <sup>CHN</sup></span></div>
   {sent?<div className="chn-request-done"><CheckCircle2 size={40}/><h2>¡Solicitud recibida!</h2>
     <p>La administración revisará tus datos. Cuando recibas la aprobación, podrás crear tu cuenta con este mismo correo o activar una cuenta existente.</p>
     <button type="button" className="primary full" onClick={onClose}>Entendido <Check size={17}/></button>
@@ -138,7 +138,7 @@ function PasswordRecovery({onClose,notify}:{onClose:()=>void;notify:(message:str
   finally{setBusy(false)}
  };
  return <div className="auth-content">
-   <div className="modal-brand"><span className="brand-icon"><Fleur size={25}/></span><span>SCOUT<span className="brand-strong">RIFAS</span> <sup>CHN</sup></span></div>
+   <div className="modal-brand"><span className="brand-icon"><Fleur size={25}/></span><span>SCOUT<span className="brand-strong">APOYA</span> <sup>CHN</sup></span></div>
    <h2>Crear nueva contraseña</h2><p className="subtle">Tu enlace de recuperación fue validado. Elige una contraseña segura para tu cuenta.</p>
    {error&&<div className="chn-form-error" role="alert"><Flag size={18}/>{error}</div>}
    <form className="form-col" onSubmit={submit}>
@@ -151,13 +151,13 @@ function PasswordRecovery({onClose,notify}:{onClose:()=>void;notify:(message:str
 function ExistingMemberJoin({done,cancel,onSkip,onApply,notify}:{done:()=>Promise<void>;cancel:()=>Promise<void>;onSkip:()=>void;onApply:()=>void;notify:(s:string,e?:boolean)=>void}){
  const [busy,setBusy]=useState(false),[error,setError]=useState('');
  const activate=async()=>{if(busy)return;setBusy(true);setError('');
-  try{await backend.enrollExisting();await done();notify('Tu acceso quedó activado. ¡Bienvenido a ScoutRifas!')}
+  try{await backend.enrollExisting();await done();notify('Tu acceso quedó activado. ¡Bienvenido a ScoutApoya!')}
   catch(err){const msg=friendlyError(err);setError(msg);notify(msg,true)}
   finally{setBusy(false)}
  };
  return <div className="auth-content">
   <span className="kicker">ACCESO A TU COMUNIDAD</span><h2>Activa tu acceso aprobado</h2>
-  <p className="subtle">Ya tienes una sesión en Supabase. Para ingresar a ScoutRifas, primero necesitas una solicitud aprobada con el mismo correo que utilizaste al iniciar sesión.</p>
+  <p className="subtle">Ya tienes una sesión en Supabase. Para ingresar a ScoutApoya, primero necesitas una solicitud aprobada con el mismo correo que utilizaste al iniciar sesión.</p>
   {error&&<div className="chn-form-error" role="alert"><Flag size={18}/>{error}</div>}
   <button type="button" className="primary full" disabled={busy} onClick={()=>{void activate()}}>{busy?'Comprobando…':'Activar acceso aprobado'} <CheckCircle2 size={17}/></button>
   <button type="button" className="secondary full" onClick={onApply}>No he enviado solicitud · Solicitar acceso</button>
@@ -287,7 +287,7 @@ function ProfilePage({person,current,onSave,notify,listings,onOpen}:{person:Prof
    {!person.adult_attested&&<label className="chn-check"><input type="checkbox" checked={adult} onChange={e=>setAdult(e.target.checked)}/> Confirmo ser mayor de 18 años.</label>}
    <button className="primary" disabled={busy} type="submit">{busy?'Guardando…':'Guardar cambios'}<Check size={16}/></button></form>:
    <div className="public-bio"><h3>Sobre esta persona</h3><p>{person.bio||'Miembro de nuestra comunidad.'}</p></div>}
-  <div className="public-listings"><h3>Rifas de {person.display_name.split(' ')[0]}</h3>{listings.length?<div className="cards-grid">{listings.map(l=><Card key={l.id} item={l} onOpen={()=>onOpen(l)}/>)}</div>:<p className="empty-small">Todavía no tiene publicaciones.</p>}</div>
+  <div className="public-listings"><h3>Sorteos de {person.display_name.split(' ')[0]}</h3>{listings.length?<div className="cards-grid">{listings.map(l=><Card key={l.id} item={l} onOpen={()=>onOpen(l)}/>)}</div>:<p className="empty-small">Todavía no tiene publicaciones.</p>}</div>
  </section>;
 }
 function Admin({items,refresh,notify}:{items:Listing[];refresh:()=>Promise<void>;notify:(s:string,e?:boolean)=>void}){
