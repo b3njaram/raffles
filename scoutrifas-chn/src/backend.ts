@@ -6,6 +6,15 @@ const url=import.meta.env.VITE_SUPABASE_URL;
 const key=import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 export const cloud=Boolean(url&&key&&!url.includes('tu-proyecto'));
 export const demoEnabled=false;
+export function friendlyError(error:unknown):string {
+ const e=error as {code?:string;status?:number;message?:string}|null;
+ const message=e?.message||'';
+ if(e?.code==='23505')return 'Este ID scout ya está asociado a una cuenta. Revisa tus datos o solicita ayuda a administración.';
+ if(e?.code==='42501'||e?.status===401||/permission denied|jwt expired|invalid jwt/i.test(message))return 'Tu sesión no autorizó esta operación. Cierra sesión y vuelve a iniciarla antes de reintentar.';
+ if(/fetch|network|Failed to fetch/i.test(message))return 'No se pudo conectar con el servidor. Revisa tu internet y vuelve a intentarlo.';
+ return message||'Ocurrió un error inesperado. Inténtalo nuevamente.';
+}
+
 export const supabase=cloud?createClient(url,key,{auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}}):null;
 const signedPhotos=new Map<string,{url:string,until:number}>();
 
@@ -57,25 +66,38 @@ export const backend={
  },
  async login(email:string,password:string){
   const r=await requireCloud().auth.signInWithPassword({email,password});if(r.error)throw r.error;
+   if(!r.data.session?.access_token)throw new Error('La sesión no quedó activa. Confirma tu correo e inténtalo nuevamente.');
  },
  async logout(){
   signedPhotos.clear();
   const r=await requireCloud().auth.signOut();if(r.error)throw r.error;
  },
- async enrollExisting(kind:MemberType,scoutId:string,name:string,group:string,adult:boolean,referral:string){
+ async enrollExisting(kind:MemberType,scoutId:string,name:string,group:string,adult:boolean,referral:string):Promise<void>{
   const s=requireCloud();
-  if(kind==='supporter'){
-   if(!adult)throw new Error('Se requiere mayoría de edad.');
-   const r=await s.rpc('chn_register_supporter',{p_name:name,p_referral:referral,p_adult:true});
-   if(r.error)throw r.error;
-  }else{
-   const r=await s.rpc('chn_register_member',{p_scout_id:scoutId,p_display_name:name,p_group_name:group});
-   if(r.error)throw r.error;
-   if(adult)await backend.attestAdult();
-  }
+  const cleanedName=name.trim();
+  if(cleanedName.length<2||cleanedName.length>65)throw new Error('Escribe tu nombre completo (2 a 65 caracteres).');
+  if(kind==='scout'&&!isScoutId(scoutId))throw new Error('Introduce tu ID scout con el formato CHN.');
+  if(kind==='supporter'&&!adult)throw new Error('El registro de simpatizantes requiere mayoría de edad.');
+  const {data:{session},error:sessionError}=await s.auth.getSession();
+  if(sessionError||!session?.access_token)throw new Error('Tu sesión caducó. Cierra sesión y vuelve a entrar.');
+  const {data:{user},error:authError}=await s.auth.getUser(session.access_token);
+  if(authError||!user||user.id!==session.user.id)throw new Error('No pudimos validar tu sesión. Vuelve a iniciar sesión.');
+  const exists=await s.from('chn_profiles').select('id').eq('id',user.id).maybeSingle();
+  if(exists.error)throw exists.error;
+  if(exists.data)return;
+  const r=await s.from('chn_profiles').insert({
+   id:user.id,scout_id:kind==='scout'?scoutId:null,display_name:cleanedName,
+   group_name:kind==='scout'?group.trim().slice(0,70):'Simpatizante',
+   member_type:kind,adult_attested:adult,referral_note:kind==='supporter'?referral.trim().slice(0,120):''
+  });
+  if(r.error)throw r.error;
  },
- async attestAdult(){
-  const r=await requireCloud().rpc('chn_attest_adult');if(r.error)throw r.error;
+ async attestAdult():Promise<void>{
+  const s=requireCloud();
+  const {data:{user},error}=await s.auth.getUser();
+  if(error||!user)throw new Error('Inicia sesión de nuevo para actualizar tus datos.');
+  const r=await s.from('chn_profiles').update({adult_attested:true}).eq('id',user.id);
+  if(r.error)throw r.error;
  },
  async list():Promise<Listing[]>{
   const s=requireCloud();
