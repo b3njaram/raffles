@@ -65,3 +65,29 @@ Reglamento federal: https://www.ordenjuridico.gob.mx/Documentos/Federal/html/wo8
 Requiere Node 22+. Ejecuta npm install, copia .env.example a .env.local, ejecuta npm run check y npm run dev.
 En Vercel: directorio raíz scoutrifas-chn, framework Vite, build npm run check, salida dist.
 La compilación automatizada no sustituye pruebas de usuarios reales por rol. En el ambiente actual no hay todavía cuentas CHN ni compras.
+
+
+## Noviembre 2026: solicitudes aprobadas ANTES de crear cuentas
+
+- Un visitante primero usa **Solicitar acceso** en la página. Esto registra su nombre, correo y categoría (Scout/simpatizante) en `public.chn_access_requests`, sin crear una cuenta en Supabase Auth.
+- La pestaña **Administración → Accesos** permite al único administrador aceptar o rechazar la solicitud. Para dar el aviso se incluye el enlace **Avisar por correo**, que abre un correo listo para enviar; no existe un servicio de envío automático configurado.
+- Tras recibir aprobación, la persona elige **Crear cuenta aprobada** y se registra con el mismo correo, tipo de participante y, si corresponde, ID CHN. La función trigger `private.chn_handle_new_user` rechaza solicitudes de ScoutRifas sin aprobación. La verificación de correo por Supabase Auth se mantiene.
+- Las personas que ya tengan una cuenta en el Supabase compartido (por ejemplo Study Compass) deben iniciar sesión y pulsar **Activar acceso aprobado**; esa función usa el correo confirmado de su cuenta, sin confiar en datos editables enviados desde el navegador.
+- ScoutRifas comparte `auth.users` con Study Compass. Una cuenta creada independientemente para Study Compass no obtiene permisos para ScoutRifas sin la aprobación anterior.
+- El único administrador se establece en `private.chn_admin_owner` y `private.chn_is_admin()`. Un trigger impide asignar el rol `admin` a otro perfil. La tabla de control privado no es accesible desde el navegador.
+- Es aconsejable configurar CAPTCHA y límites por IP antes de anunciar públicamente el formulario: el control actual evita solicitudes duplicadas por correo pero no sustituye medidas antispam.
+
+## Calculadora privada y fotografías
+
+- El editor de nuevas rifas admite **1–10 fotografías** JPG, PNG o WebP, de hasta 5 MB por archivo. Las imágenes se almacenan en el bucket privado de las publicaciones.
+- Antes de guardar se puede calcular el **ingreso bruto al vender todos los boletos**, costos del premio, gastos extras, ganancia neta, punto de equilibrio y número aproximado de boletos para alcanzar una meta.
+- La comisión del sitio es **una simulación 0/3/5/10 %**, con 0 % predeterminado. No cobra dinero ni cambia la asignación de fondos.
+- Los costos y las metas se almacenan en `chn_raffle_financials`, protegidos por RLS para propietario y único administrador. La inserción de rifa y plan se hace en una operación RPC transaccional.
+- No son estimaciones de ingresos garantizados: las simulaciones suponen 100 % de boletos vendidos y no incluyen impuestos y permisos no especificados.
+
+## Despliegue y pruebas
+
+- Branch y repositorio: `b3njaram/raffles` → `scoutrifas-chn`.
+- Vercel personal, proyecto `scoutrifas-chn`; build `npm run check` (TypeScript, pruebas y Vite).
+- El test SQL de integración comprobó solicitud anónima, aprobación administrativa, activación de una cuenta existente, impedimento de segundo administrador y creación de una rifa con 10 fotografías y finanzas privadas. Todos los cambios de prueba se revirtieron mediante `ROLLBACK`.
+- No hay pasarela de pagos ni ventas activadas por defecto. Se requiere permiso de SEGOB aplicable antes de vender boletos, además de revisión fiscal y autorización para usar la identidad oficial de Scouts de México.
