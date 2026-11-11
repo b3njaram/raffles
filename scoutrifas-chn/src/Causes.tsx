@@ -9,12 +9,12 @@ import './causes.css';
 type Notify=(message:string,isError?:boolean)=>void;
 export type AckDisplay={ack_no:number;amount_mxn:number;cause_title:string;issued_at:string};
 
-export function CauseGallery({causes,onOpen}:{causes:Cause[];onOpen:(cause:Cause)=>void}){
- const approved=causes.filter(c=>c.status==='active'||c.status==='finished');
+export function CauseGallery({causes,onOpen,includeDrafts=false}:{causes:Cause[];onOpen:(cause:Cause)=>void;includeDrafts?:boolean}){
+ const approved=includeDrafts?causes:causes.filter(c=>c.status==='active'||c.status==='finished');
  return <div className="chn-causes-grid">
   {approved.map(c=><button key={c.id} type="button" className="chn-cause-card" onClick={()=>onOpen(c)}>
    <div className="chn-cause-cover">{c.image_paths[0]&&imageUrl(c.image_paths[0])?<img loading="lazy" src={imageUrl(c.image_paths[0])} alt={c.title}/>:<span className="chn-cause-cover-fallback"><Heart size={42}/></span>}
-    <span className="chn-cause-tag"><Heart size={14}/> Causa comunitaria</span>
+    <span className="chn-cause-tag"><Heart size={14}/> {c.status==='pending'?'En revisión':c.status==='paused'?'Pausada':c.status==='cancelled'?'Cancelada':'Causa comunitaria'}</span>
    </div>
    <div className="chn-cause-copy"><span className="chn-cause-category">{c.category} · Grupo 4 CHN</span>
     <h3>{c.title}</h3><p>{c.description}</p>
@@ -40,7 +40,7 @@ export function AckPanel({data,onClose}:{data:AckDisplay;onClose:()=>void}){
     <div><span>Fecha de registro</span><strong>{new Date(data.issued_at).toLocaleString('es-MX')}</strong></div>
     <div><span>Estado</span><strong>Intención registrada · Sin pago</strong></div>
    </div>
-   <div className="chn-ack-footer">El folio es único. No otorga participaciones, premios ni ventajas en sorteos. Si se efectúa una donación real, su comprobante correspondiente debe ser emitido por la entidad receptora conforme a la normativa aplicable.</div>
+   <div className="chn-ack-footer">El folio es único. No proporciona contraprestaciones. Si se efectúa una donación real, su comprobante correspondiente debe ser emitido por la entidad receptora conforme a la normativa aplicable.</div>
   </div>
   <div className="chn-ack-actions"><button type="button" className="primary" onClick={()=>window.print()}><Printer size={18}/> Imprimir / guardar PDF</button><button className="secondary" type="button" onClick={onClose}>Cerrar</button></div>
  </div>;
@@ -74,7 +74,7 @@ export function CauseDetail({cause,onClose,onUpdated,onAcknowledged,notify}:{cau
     <label>Mensaje para la causa (opcional)<textarea maxLength={240} rows={2} value={note} onChange={e=>setNote(e.target.value)} placeholder="Un mensaje de apoyo para Grupo 4…"/></label>
     <button className="primary full" type="submit" disabled={busy||!open}>{busy?'Registrando…':open?'Registrar intención por '+money(cause.fixed_support_amount):'No disponible'} <ArrowRight size={17}/></button>
    </form>
-   <p className="chn-cause-disclaimer"><ShieldCheck size={17}/> El folio entregado es un acuse de intención, no comprobante de donativo pagado. No se vincula a sorteos ni genera beneficios de participación.</p>
+   <p className="chn-cause-disclaimer"><ShieldCheck size={17}/> El folio entregado es un acuse de intención, no comprobante de donativo pagado. No proporciona premios ni contraprestaciones.</p>
   </div>
  </div>;
 }
@@ -104,7 +104,7 @@ export function CauseEditor({user,onClose,onSaved,notify}:{user:Profile;onClose:
   finally{setBusy(false)}
  };
  return <div className="chn-cause-editor"><span className="kicker">PROYECTOS · GRUPO 4 CHN</span><h2>Crear una causa</h2>
-  <p>Comparte una necesidad concreta y define un monto fijo por intención de apoyo. No contiene premios ni participaciones en sorteos.</p>
+  <p>Comparte una necesidad concreta y define un monto fijo por intención de apoyo. Es una iniciativa comunitaria sin contraprestaciones.</p>
   <form className="form-col" onSubmit={submit}>
    <label>Nombre de la causa<input required minLength={5} maxLength={110} value={draft.title} onChange={e=>change('title',e.target.value)} placeholder="Ej. Transporte para campamento"/></label>
    <label>¿Para qué se usarían los recursos?<textarea required minLength={20} maxLength={2500} rows={4} value={draft.description} onChange={e=>change('description',e.target.value)} placeholder="Describe el proyecto y cómo beneficiaría al Grupo 4."/></label>
