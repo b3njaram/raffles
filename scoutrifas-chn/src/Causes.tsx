@@ -2,12 +2,12 @@ import {useEffect,useMemo,useState} from 'react';
 import type {FormEvent} from 'react';
 import {ArrowRight,Clock3,Heart,ImagePlus,Printer,ShieldCheck,Users,X} from 'lucide-react';
 import {backend,friendlyError,imageUrl} from './backend';
-import type {Cause,CauseAcknowledgment,CauseDraft,Category,Profile} from './types';
-import {ackLabel,categories,causeIsActive,money,remaining} from './types';
+import type {Cause,CauseAcknowledgment,CauseDraft,Category,Profile,RecipientOption} from './types';
+import {ackLabel,categories,causeIsActive,intentionProgress,money,remaining} from './types';
 import './causes.css';
 
 type Notify=(message:string,isError?:boolean)=>void;
-export type AckDisplay={ack_no:number;amount_mxn:number;cause_title:string;issued_at:string};
+export type AckDisplay={ack_no:number;amount_mxn:number;cause_title:string;issued_at:string;intent_status?:'intent'|'pending'|'approved'|'rejected';recipient_name?:string|null};
 
 export function CauseGallery({causes,onOpen,includeDrafts=false}:{causes:Cause[];onOpen:(cause:Cause)=>void;includeDrafts?:boolean}){
  const approved=includeDrafts?causes:causes.filter(c=>c.status==='active'||c.status==='finished');
@@ -19,7 +19,10 @@ export function CauseGallery({causes,onOpen,includeDrafts=false}:{causes:Cause[]
    <div className="chn-cause-copy"><span className="chn-cause-category">{c.category} · Grupo 4 CHN</span>
     <h3>{c.title}</h3><p>{c.description}</p>
     <div className="chn-cause-amount"><span>Apoyo sugerido por registro</span><strong>{money(c.fixed_support_amount)}</strong></div>
-    <div className="chn-cause-meta"><span><Users size={15}/> {c.intention_count} intenciones</span><span><Clock3 size={15}/> {remaining(c.end_at)}</span></div>
+    <div className="chn-cause-meta"><span><Users size={15}/> {c.intention_count} / {c.max_intentions} intenciones</span><span><Clock3 size={15}/> {remaining(c.end_at)}</span></div>
+    <div className="chn-intentions-progress" role="progressbar" aria-label={'Intenciones de '+c.title} aria-valuenow={c.intention_count} aria-valuemin={0} aria-valuemax={c.max_intentions}>
+     <span style={{width:intentionProgress(c)+'%'}}/>
+    </div><small className="chn-intentions-caption">{c.intention_count>=c.max_intentions?'Cupo completo':c.max_intentions-c.intention_count+' espacios disponibles'}</small>
     <span className="chn-cause-action">Conocer la causa <ArrowRight size={17}/></span>
    </div>
   </button>)}
@@ -36,9 +39,9 @@ export function AckPanel({data,onClose}:{data:AckDisplay;onClose:()=>void}){
    <div className="chn-ack-details">
     <div><span>Causa</span><strong>{data.cause_title}</strong></div>
     <div><span>Monto previsto</span><strong>{money(data.amount_mxn)}</strong></div>
-    <div><span>Destino previsto</span><strong>Grupo 4 · Chihuahua Norte</strong></div>
+    <div><span>Cuenta destinataria seleccionada</span><strong>{data.recipient_name||'Grupo 4 · Chihuahua Norte'}</strong></div>
     <div><span>Fecha de registro</span><strong>{new Date(data.issued_at).toLocaleString('es-MX')}</strong></div>
-    <div><span>Estado</span><strong>Intención registrada · Sin pago</strong></div>
+    <div><span>Estado de revisión</span><strong>{data.intent_status==='approved'?'Aprobada por administración':data.intent_status==='rejected'?'Rechazada':data.intent_status==='pending'?'Pendiente de aprobación':'Intención registrada'} · Sin pago</strong></div>
    </div>
    <div className="chn-ack-footer">El folio es único. No proporciona contraprestaciones. Si se efectúa una donación real, su comprobante correspondiente debe ser emitido por la entidad receptora conforme a la normativa aplicable.</div>
   </div>
@@ -48,11 +51,18 @@ export function AckPanel({data,onClose}:{data:AckDisplay;onClose:()=>void}){
 
 export function CauseDetail({cause,onClose,onUpdated,onAcknowledged,notify}:{cause:Cause;onClose:()=>void;onUpdated:()=>Promise<void>;onAcknowledged:(d:CauseAcknowledgment)=>void;notify:Notify}){
  const [photo,setPhoto]=useState(0),[note,setNote]=useState(''),[busy,setBusy]=useState(false);
+ const [recipients,setRecipients]=useState<RecipientOption[]>([]),[recipientId,setRecipientId]=useState(cause.owner_id);
  useEffect(()=>setPhoto(0),[cause.id]);
- const open=causeIsActive(cause);
+ useEffect(()=>{let mounted=true;setRecipientId(cause.owner_id);
+  void backend.availableRecipients().then(options=>{if(!mounted)return;setRecipients(options);
+   setRecipientId(current=>options.some(x=>x.id===current)?current:(options.find(x=>x.role==='admin')?.id||options[0]?.id||''));
+  }).catch(err=>notify(friendlyError(err),true));
+  return()=>{mounted=false};
+ },[cause.id,cause.owner_id,notify]);
+ const open=causeIsActive(cause)&&cause.intention_count<cause.max_intentions;
  const submit=async(e:FormEvent)=>{e.preventDefault();if(busy||!open)return;setBusy(true);
-  try{const result=await backend.registerCauseIntent(cause.id,note);
-   notify('Acuse '+ackLabel(result.ack_no)+' creado. No se realizó ningún cobro.');
+  try{const result=await backend.registerCauseIntent(cause.id,recipientId,note);
+   notify('Acuse '+ackLabel(result.ack_no)+' emitido. La intención queda pendiente de tu aprobación; no se realizó ningún cobro.');
    await onUpdated();onClose();onAcknowledged(result);
   }catch(err){notify(friendlyError(err),true)}finally{setBusy(false)}
  };
@@ -64,15 +74,26 @@ export function CauseDetail({cause,onClose,onUpdated,onAcknowledged,notify}:{cau
   <div className="chn-cause-detail-info">
    <span className="kicker">CAUSA PARA EL GRUPO 4</span><h2>{cause.title}</h2>
    <p className="chn-cause-description">{cause.description}</p>
-   <div className="chn-cause-amount-box"><span>Monto fijado por el organizador para cada intención</span><strong>{money(cause.fixed_support_amount)}</strong><small>Puedes registrar intenciones adicionales cuantas veces quieras. No hay cobro en esta página.</small></div>
-   <div className="chn-cause-metrics"><span><Heart size={16}/> {cause.intention_count} intenciones registradas</span><span><Clock3 size={16}/> {remaining(cause.end_at)}</span></div>
+   <div className="chn-cause-amount-box"><span>Monto fijado por el organizador para cada intención</span><strong>{money(cause.fixed_support_amount)}</strong><small>Puedes registrar varias intenciones mientras haya cupo disponible. No hay cobros en esta página.</small></div>
+   <div className="chn-cause-metrics"><span><Heart size={16}/> {cause.intention_count} / {cause.max_intentions} intenciones registradas</span><span><Clock3 size={16}/> {remaining(cause.end_at)}</span></div>
+   <div className="chn-intentions-progress chn-intentions-progress-large" role="progressbar" aria-label="Cupo de intenciones" aria-valuenow={cause.intention_count} aria-valuemin={0} aria-valuemax={cause.max_intentions}>
+    <span style={{width:intentionProgress(cause)+'%'}}/>
+   </div>
+   <p className="chn-intentions-detail">{cause.intention_count>=cause.max_intentions?'Límite de intenciones alcanzado.':(cause.max_intentions-cause.intention_count)+' espacios restantes. Incluye intenciones pendientes y aprobadas.'}</p>
    {cause.target_amount>0&&<div className="chn-cause-goal">
     <div><b>Meta orientativa: {money(cause.target_amount)}</b><span>{money(cause.intention_total)} en intenciones, NO cobrado</span></div>
     <div className="chn-cause-progress"><span style={{width:Math.min(100,100*cause.intention_total/cause.target_amount)+'%'}}/></div>
    </div>}
    <form onSubmit={submit} className="form-col">
+    <label>Cuenta a la que diriges esta intención
+     <select required value={recipientId} onChange={e=>setRecipientId(e.target.value)}>
+      {recipients.length===0&&<option value="">Cargando miembros aprobados…</option>}
+      {recipients.map(r=><option key={r.id} value={r.id}>{r.id===cause.owner_id?'Organizador · ':r.role==='admin'?'Administración · ':'Otro miembro · '}{r.display_name}</option>)}
+     </select>
+    </label>
+    <p className="chn-intentions-caption">Solo se registra la persona destinataria. No se piden cuentas bancarias ni se realizan transferencias. La administración revisa cada solicitud.</p>
     <label>Mensaje para la causa (opcional)<textarea maxLength={240} rows={2} value={note} onChange={e=>setNote(e.target.value)} placeholder="Un mensaje de apoyo para Grupo 4…"/></label>
-    <button className="primary full" type="submit" disabled={busy||!open}>{busy?'Registrando…':open?'Registrar intención por '+money(cause.fixed_support_amount):'No disponible'} <ArrowRight size={17}/></button>
+    <button className="primary full" type="submit" disabled={busy||!open||!recipients.some(r=>r.id===recipientId)}>{busy?'Registrando…':cause.intention_count>=cause.max_intentions?'Cupo completo':open?'Solicitar intención por '+money(cause.fixed_support_amount):'No disponible'} <ArrowRight size={17}/></button>
    </form>
    <p className="chn-cause-disclaimer"><ShieldCheck size={17}/> El folio entregado es un acuse de intención, no comprobante de donativo pagado. No proporciona premios ni contraprestaciones.</p>
   </div>
@@ -80,7 +101,7 @@ export function CauseDetail({cause,onClose,onUpdated,onAcknowledged,notify}:{cau
 }
 
 export function CauseEditor({user,onClose,onSaved,notify}:{user:Profile;onClose:()=>void;onSaved:()=>Promise<void>;notify:Notify}){
- const [draft,setDraft]=useState<CauseDraft>({title:'',description:'',category:'Aventura',endAt:'',amount:100,target:3000});
+ const [draft,setDraft]=useState<CauseDraft>({title:'',description:'',category:'Aventura',endAt:'',amount:100,target:3000,maxIntentions:100});
  const [photos,setPhotos]=useState<File[]>([]),[busy,setBusy]=useState(false);
  const preview=useMemo(()=>photos.map(file=>({name:file.name,url:URL.createObjectURL(file)})),[photos]);
  useEffect(()=>()=>{preview.forEach(p=>URL.revokeObjectURL(p.url))},[preview]);
@@ -94,6 +115,7 @@ export function CauseEditor({user,onClose,onSaved,notify}:{user:Profile;onClose:
  const submit=async(e:FormEvent)=>{e.preventDefault();if(busy)return;
   if(new Date(draft.endAt).getTime()<=Date.now()+3600000){notify('El cierre debe ser al menos una hora en el futuro.',true);return}
   if(photos.length<1||photos.length>10){notify('Agrega de 1 a 10 fotos.',true);return}
+  if(!Number.isInteger(draft.maxIntentions)||draft.maxIntentions<1||draft.maxIntentions>100000){notify('El límite debe estar entre 1 y 100,000 intenciones.',true);return}
   setBusy(true);const uploaded:string[]=[];
   try{
    for(const photo of photos)uploaded.push(await backend.upload(photo,user.id,'listings'));
@@ -112,6 +134,12 @@ export function CauseEditor({user,onClose,onSaved,notify}:{user:Profile;onClose:
     <label>Cierre de la causa<input required type="datetime-local" value={draft.endAt} onChange={e=>change('endAt',e.target.value)}/></label></div>
    <div className="two-fields"><label>Importe por intención (MXN)<input required type="number" min={20} max={100000} step={1} value={draft.amount} onChange={e=>change('amount',Number(e.target.value))}/></label>
     <label>Meta prevista (MXN)<input required type="number" min={0} max={100000000} step={1} value={draft.target} onChange={e=>change('target',Number(e.target.value))}/></label></div>
+   <label>Límite máximo de intenciones para esta causa
+    <input type="number" required min={1} max={100000} step={1} value={draft.maxIntentions} onChange={e=>change('maxIntentions',Number(e.target.value))}/>
+    <small>El cupo lo define el organizador al crear la causa. Cada registro pendiente o aprobado utiliza un espacio.</small>
+   </label>
+   <div className="chn-intentions-progress" role="progressbar" aria-label="Progreso de nuevas intenciones" aria-valuemin={0} aria-valuemax={Math.max(1,draft.maxIntentions)} aria-valuenow={0}><span style={{width:'0%'}}/></div>
+   <p className="chn-intentions-caption">Al publicarse comenzará en 0 / {draft.maxIntentions.toLocaleString('es-MX')} intenciones.</p>
    <div className="chn-cause-projector"><small>Intenciones necesarias para igualar la meta</small><strong>{draft.amount>0?Math.ceil(draft.target/draft.amount).toLocaleString('es-MX'):'—'}</strong><span>Esto es planificación; no representa dinero recibido.</span></div>
    <label>Fotos de la causa ({photos.length}/10)<div className="upload-zone"><ImagePlus size={25}/><b>Elegir fotos</b><small>1 a 10 imágenes · 5 MB máximo cada una</small><input disabled={busy||photos.length>=10} type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={e=>{addPhotos(Array.from(e.target.files||[]));e.target.value=''}}/></div></label>
    {!!preview.length&&<div className="chn-upload-previews">{preview.map((pic,i)=><div className="chn-preview" key={pic.url}><img src={pic.url} alt={'Foto '+(i+1)}/><button type="button" aria-label={'Quitar '+pic.name} onClick={()=>setPhotos(current=>current.filter((_,index)=>index!==i))}><X size={16}/></button></div>)}</div>}
@@ -130,7 +158,8 @@ export function CauseAdmin({causes,onUpdate,notify}:{causes:Cause[];onUpdate:()=
  return <div className="admin-list">
   {causes.map(c=><div className="admin-line" key={c.id}><img src={imageUrl(c.image_paths[0])} alt=""/>
    <div className="grow"><b>{c.title}</b><p>{c.owner?.display_name||'Organizador'} · {money(c.fixed_support_amount)} por intención · {c.status}</p>
-    <small>{c.intention_count} intenciones · {money(c.intention_total)} previstos, no cobrados · Meta {money(c.target_amount)}</small></div>
+    <small>{c.intention_count} / {c.max_intentions} intenciones · {money(c.intention_total)} previstos, no cobrados · Meta {money(c.target_amount)}</small>
+    <div className="chn-intentions-progress"><span style={{width:intentionProgress(c)+'%'}}/></div></div>
    <div className="admin-actions">
     {(c.status==='pending'||c.status==='paused')&&<button type="button" className="small-approve" disabled={!!busy} onClick={()=>{void act(c,'active')}}>Aprobar</button>}
     {c.status==='active'&&<button type="button" disabled={!!busy} onClick={()=>{void act(c,'paused')}}>Pausar</button>}
