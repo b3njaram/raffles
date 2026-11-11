@@ -125,7 +125,7 @@ export const backend={
     .order('created_at',{ascending:false}).limit(250);
   if(r.error)throw r.error;
   const list=(r.data||[]) as Cause[];
-  await authorizeListingPhotos(list);
+  await authorizeCausePhotos(list);
   return list;
  },
  async createCause(d:CauseDraft,images:string[]):Promise<string>{
