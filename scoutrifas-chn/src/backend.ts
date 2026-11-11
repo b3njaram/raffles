@@ -1,5 +1,5 @@
 import {createClient} from '@supabase/supabase-js';
-import type {AccessRequest,Category,Cause,CauseAcknowledgment,CauseDraft,FreeDrawEntry,Listing,MemberType,Profile,SupportIntent,SupportPurpose} from './types';
+import type {AccessRequest,Cause,CauseAcknowledgment,CauseDraft,MemberType,Profile,SupportIntent} from './types';
 import {canViewCatalogue,isScoutId} from './types';
 
 const url=import.meta.env.VITE_SUPABASE_URL;
@@ -19,7 +19,7 @@ export function friendlyError(error:unknown):string {
 export const supabase=cloud?createClient(url,key,{auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}}):null;
 const signedPhotos=new Map<string,{url:string,until:number}>();
 
-async function authorizeListingPhotos(list:readonly {image_paths:string[]}[]) {
+async function authorizeCausePhotos(list:readonly {image_paths:string[]}[]) {
  if(!supabase)return;
  const now=Date.now();
  const paths=[...new Set(list.flatMap(l=>l.image_paths).filter(p=>p.includes('/listings/')))]
@@ -117,17 +117,6 @@ export const backend={
   const r=await s.from('chn_profiles').update({adult_attested:true}).eq('id',user.id);
   if(r.error)throw r.error;
  },
- async list():Promise<Listing[]>{
-  const s=requireCloud();
-  const person=await backend.session();
-  if(!canViewCatalogue(person))return [];
-  const r=await s.from('chn_listings').select('*, owner:chn_profiles!chn_listings_owner_id_fkey(*)')
-   .order('created_at',{ascending:false}).limit(250);
-  if(r.error)throw r.error;
-  const list=(r.data||[]) as Listing[];
-  await authorizeListingPhotos(list);
-  return list;
- },
  async listCauses():Promise<Cause[]>{
   const s=requireCloud();
   const person=await backend.session();
@@ -176,37 +165,11 @@ export const backend={
   const r=await requireCloud().storage.from(folder==='avatars'?'chn-avatars':'chn-listings').remove(paths);
   if(r.error)throw r.error;
  },
- async createFreeDraw(args:{title:string;description:string;category:Category;endAt:string;capacity:number;images:string[]}):Promise<string>{
-  if(args.images.length<1||args.images.length>10)throw new Error('El sorteo necesita entre 1 y 10 fotos.');
-  const r=await requireCloud().rpc('chn_create_free_draw',{
-   p_title:args.title,p_description:args.description,p_category:args.category,
-   p_end_at:args.endAt,p_capacity:args.capacity,p_images:args.images
-  });
-  if(r.error)throw r.error;return String(r.data);
- },
- async joinFreeDraw(listingId:string):Promise<number>{
-  const r=await requireCloud().rpc('chn_join_free_draw',{p_listing:listingId});
-  if(r.error)throw r.error;return Number(r.data);
- },
- async recordFreeDraw(listingId:string,entryNo:number,reference:string):Promise<void>{
-  const r=await requireCloud().rpc('chn_record_free_draw',{p_listing:listingId,p_entry_no:entryNo,p_reference:reference});
-  if(r.error)throw r.error;
- },
- async freeEntries(userId?:string):Promise<FreeDrawEntry[]>{
-  let query=requireCloud().from('chn_free_draw_entries').select('*').order('created_at',{ascending:false}).limit(1000);
-  if(userId)query=query.eq('user_id',userId);
-  const r=await query;if(r.error)throw r.error;
-  return (r.data||[]) as FreeDrawEntry[];
- },
  async supportIntents(userId?:string):Promise<SupportIntent[]>{
   let query=requireCloud().from('chn_support_pledges').select('*').order('created_at',{ascending:false}).limit(1000);
   if(userId)query=query.eq('user_id',userId);
   const r=await query;if(r.error)throw r.error;
   return (r.data||[]) as SupportIntent[];
- },
- async submitSupportIntent(amount:number,purpose:SupportPurpose,note:string):Promise<void>{
-  const r=await requireCloud().rpc('chn_submit_support_intent',{p_amount:amount,p_purpose:purpose,p_note:note});
-  if(r.error)throw r.error;
  },
  async members():Promise<Profile[]>{
   const r=await requireCloud().from('chn_profiles').select('*').order('created_at',{ascending:false}).limit(1000);
@@ -216,8 +179,5 @@ export const backend={
   const r=await requireCloud().rpc('chn_review_user',{p_user:id,p_verified:verified});
   if(r.error)throw r.error;
  },
- async reviewListing(id:string,action:'active'|'paused'|'cancelled'){
-  const r=await requireCloud().rpc('chn_review_listing',{p_listing:id,p_action:action});
-  if(r.error)throw r.error;
- },
+
 };
