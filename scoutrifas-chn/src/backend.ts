@@ -1,5 +1,5 @@
 import {createClient} from '@supabase/supabase-js';
-import type {AccessRequest,Category,FreeDrawEntry,Listing,MemberType,Profile,SupportIntent,SupportPurpose} from './types';
+import type {AccessRequest,Category,Cause,CauseAcknowledgment,CauseDraft,FreeDrawEntry,Listing,MemberType,Profile,SupportIntent,SupportPurpose} from './types';
 import {canViewCatalogue,isScoutId} from './types';
 
 const url=import.meta.env.VITE_SUPABASE_URL;
@@ -19,7 +19,7 @@ export function friendlyError(error:unknown):string {
 export const supabase=cloud?createClient(url,key,{auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}}):null;
 const signedPhotos=new Map<string,{url:string,until:number}>();
 
-async function authorizeListingPhotos(list:Listing[]) {
+async function authorizeListingPhotos(list:readonly {image_paths:string[]}[]) {
  if(!supabase)return;
  const now=Date.now();
  const paths=[...new Set(list.flatMap(l=>l.image_paths).filter(p=>p.includes('/listings/')))]
@@ -127,6 +127,36 @@ export const backend={
   const list=(r.data||[]) as Listing[];
   await authorizeListingPhotos(list);
   return list;
+ },
+ async listCauses():Promise<Cause[]>{
+  const s=requireCloud();
+  const person=await backend.session();
+  if(!canViewCatalogue(person))return [];
+  const r=await s.from('chn_causes').select('*, owner:chn_profiles!chn_causes_owner_id_fkey(*)')
+    .order('created_at',{ascending:false}).limit(250);
+  if(r.error)throw r.error;
+  const list=(r.data||[]) as Cause[];
+  await authorizeListingPhotos(list);
+  return list;
+ },
+ async createCause(d:CauseDraft,images:string[]):Promise<string>{
+  if(images.length<1||images.length>10)throw new Error('Agrega entre 1 y 10 fotos.');
+  const r=await requireCloud().rpc('chn_create_cause',{
+   p_title:d.title,p_description:d.description,p_category:d.category,
+   p_end_at:d.endAt,p_amount:d.amount,p_target:d.target,p_images:images
+  });
+  if(r.error)throw r.error;return String(r.data);
+ },
+ async reviewCause(id:string,action:'active'|'paused'|'cancelled'):Promise<void>{
+  const r=await requireCloud().rpc('chn_review_cause',{p_cause:id,p_action:action});
+  if(r.error)throw r.error;
+ },
+ async registerCauseIntent(id:string,note:string):Promise<CauseAcknowledgment>{
+  const r=await requireCloud().rpc('chn_register_cause_intent',{p_cause:id,p_note:note});
+  if(r.error)throw r.error;
+  const record=Array.isArray(r.data)?r.data[0]:r.data;
+  if(!record||typeof record.ack_no!=='number')throw new Error('No llegó el folio de confirmación.');
+  return record as CauseAcknowledgment;
  },
  async updateProfile(id:string,changes:Partial<Pick<Profile,'display_name'|'group_name'|'bio'|'avatar_path'>>){
   const r=await requireCloud().from('chn_profiles').update(changes).eq('id',id);

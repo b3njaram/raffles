@@ -39,9 +39,28 @@ export function calculateRaffle(price:number,count:number,plan:RafflePlan){
 }
 export type SupportPurpose='Actividades'|'Transporte'|'Materiales'|'Formación'|'General';
 export const supportPurposes:SupportPurpose[]=['Actividades','Transporte','Materiales','Formación','General'];
+
+export interface Cause {
+ id:string;owner_id:string;owner?:Profile;title:string;description:string;category:Category;
+ image_paths:string[];fixed_support_amount:number;target_amount:number;end_at:string;
+ status:ListingStatus;intention_count:number;intention_total:number;created_at:string;
+}
+export interface CauseDraft {
+ title:string;description:string;category:Category;endAt:string;
+ amount:number;target:number;
+}
+export interface CauseAcknowledgment {
+ intent_id:string;ack_no:number;amount_mxn:number;cause_title:string;issued_at:string;
+}
+export function causeIsActive(c:Cause):boolean{
+ return c.status==='active'&&new Date(c.end_at).getTime()>Date.now();
+}
+export function ackLabel(no:number):string{
+ return 'G4-'+String(no).padStart(8,'0');
+}
 export interface SupportIntent {
  id:string;user_id:string;amount:number;purpose:SupportPurpose;note:string;
- status:'intent';created_at:string;
+ status:'intent';created_at:string;cause_id:string|null;acknowledgment_no:number;
 }
 export interface FreeDrawEntry {
  id:string;listing_id:string;user_id:string;entry_no:number;created_at:string;
