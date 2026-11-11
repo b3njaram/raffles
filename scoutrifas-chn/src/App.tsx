@@ -249,18 +249,19 @@ function SupportIntentModal({onClose,onSaved,notify}:{onClose:()=>void;onSaved:(
  const [amount,setAmount]=useState(100),[purpose,setPurpose]=useState<SupportPurpose>('General'),[note,setNote]=useState(''),[busy,setBusy]=useState(false);
  const submit=async(e:FormEvent)=>{e.preventDefault();if(busy)return;
   setBusy(true);try{await backend.submitSupportIntent(amount,purpose,note);
-   notify('Tu intención de apoyo quedó registrada. No se realizó ningún cobro ni se te asignó participación.');
+   notify('Tu intención de apoyar al Grupo 4 quedó registrada. No se realizó ningún cobro ni se te asignó participación.');
    onSaved();onClose();
   }catch(err){notify(friendlyError(err),true)}finally{setBusy(false)}
  };
  return <div className="auth-content"><div className="modal-brand"><span className="brand-icon"><Heart size={23}/></span><span>SCOUT<span className="brand-strong">APOYA</span> <sup>CHN</sup></span></div>
-  <h2>Apoya una buena acción</h2>
-  <p className="subtle">Registra una intención de donación para apoyar una causa scout. <b>Este formulario no cobra dinero.</b></p>
+  <h2>Apoya al Grupo 4</h2>
+  <p className="subtle">Registra una intención de apoyo destinada a los proyectos del Grupo 4 de Chihuahua Norte. <b>Este formulario no cobra dinero ni emite comprobantes fiscales.</b></p>
   <form className="form-col" onSubmit={submit}>
    <label>Monto que te gustaría aportar (MXN)</label>
    <div className="chn-donation-amounts">{[50,100,200,500].map(n=><button type="button" key={n} className={amount===n?'selected':''} onClick={()=>setAmount(n)}>{money(n)}</button>)}</div>
    <label>Otro monto<input type="number" min={20} max={100000} required step={1} value={amount} onChange={e=>setAmount(Number(e.target.value))}/></label>
-   <label>Destino del apoyo<select value={purpose} onChange={e=>setPurpose(e.target.value as SupportPurpose)}>{supportPurposes.map(c=><option key={c}>{c}</option>)}</select></label>
+   <p className="chn-beneficiary-note"><b>Destino previsto:</b> Grupo 4 · Chihuahua Norte</p>
+   <label>Proyecto del Grupo 4<select value={purpose} onChange={e=>setPurpose(e.target.value as SupportPurpose)}>{supportPurposes.map(c=><option key={c}>{c}</option>)}</select></label>
    <label>Mensaje (opcional)<textarea rows={2} maxLength={240} value={note} onChange={e=>setNote(e.target.value)} placeholder="¿A quién te gustaría ayudar?"/></label>
    <div className="notice"><Heart size={18}/> Donar no es requisito para entrar a los sorteos gratuitos y no te da más participaciones. No se realizan transferencias ni cobros.</div>
    <button className="primary full" disabled={busy} type="submit">{busy?'Guardando…':'Registrar intención de apoyar'} <Heart size={16}/></button>
@@ -451,7 +452,7 @@ export default function App(){
  const live=items.filter(isLive).length;
  return <>
   <header className="site-header"><div className="nav-container">
-   <button className="logo" onClick={()=>show('explore')} aria-label="ScoutApoya inicio"><span className="logo-mark"><Fleur size={29}/></span><span className="logo-name">SCOUT<span>APOYA</span><small>CHIHUAHUA NORTE</small></span></button>
+   <button className="logo" onClick={()=>show('explore')} aria-label="ScoutApoya inicio"><span className="logo-mark"><Fleur size={29}/></span><span className="logo-name">SCOUT<span>APOYA</span><small>GRUPO 4 · CHN</small></span></button>
    <nav className={menu?'nav-links open':'nav-links'}>
     <button className={screen==='explore'?'nav-active':''} onClick={()=>show('explore')}>Inicio y sorteos</button>
     <button onClick={support}>Apoyar proyectos</button>
@@ -468,9 +469,9 @@ export default function App(){
    </div></div></header>
   <main>{screen==='explore'?<>
    <div className="hero-shell"><section className="hero"><div className="hero-photo" style={{backgroundImage:"linear-gradient(90deg,rgba(33,23,44,.93),rgba(33,23,44,.42)),url('"+sampleHero+"')"}}/>
-    <div className="hero-content"><span className="hero-label">⚜ COMUNIDAD SCOUT · CHIHUAHUA NORTE</span>
+    <div className="hero-content"><span className="hero-label">⚜ GRUPO 4 · CHIHUAHUA NORTE</span>
      <h1>Una buena acción<br/>puede cambiar <em>vidas.</em></h1>
-     <p>Apoya proyectos de nuestra comunidad. También puedes explorar sorteos gratuitos e independientes: <b>no necesitas donar para participar.</b></p>
+     <p>Apoya las actividades del Grupo 4 de Chihuahua Norte. También puedes explorar sorteos gratuitos e independientes: <b>no necesitas donar para participar.</b></p>
      <div className="hero-actions"><button className="hero-primary" onClick={support}><Heart size={18}/> Quiero apoyar</button>
       <button className="hero-secondary" onClick={()=>access?document.getElementById('explorar')?.scrollIntoView({behavior:'smooth'}):needsEnrollment?show('setup'):openApplication()}>Explorar sorteos <ArrowRight size={18}/></button>
      </div></div><div className="hero-stamp"><Fleur size={27}/><span>SIEMPRE<br/>LISTOS</span></div>
@@ -482,8 +483,8 @@ export default function App(){
    </section>
    <section className="chn-support-section">
     <div className="chn-support-deco"><Heart size={48}/></div>
-    <div><span className="kicker">TU APOYO DEJA HUELLA</span><h2>Impulsa nuevas aventuras</h2>
-     <p>Materiales, transporte, formación y actividades para la comunidad. Elige qué causa quieres apoyar sin asumir obligaciones de compra.</p>
+    <div><span className="kicker">TU APOYO DEJA HUELLA</span><h2>Impulsa proyectos del Grupo 4</h2>
+     <p>Materiales, transporte, formación y actividades del Grupo 4 de Chihuahua Norte. Elige qué proyecto te interesa apoyar, sin obligación de compra.</p>
      <p className="chn-independence">Las donaciones nunca compran boletos ni generan oportunidades de ganar. Esta página no procesa pagos.</p></div>
     <button className="primary" onClick={support}>Quiero apoyar <Heart size={18}/></button>
    </section>
@@ -499,7 +500,7 @@ export default function App(){
     {loading?<div className="empty"><Compass size={40}/> Cargando…</div>:results.length?<div className="cards-grid">{results.map(l=><Card key={l.id} item={l} onOpen={()=>setSelected(l)}/>)}</div>:
      <div className="empty"><Compass size={42}/><h3>Aún no hay sorteos disponibles</h3><p>Estamos preparando las actividades y su documentación.</p></div>}
    </section>:<section className="explore-section private-welcome"><div className="private-welcome-inner"><Compass size={35}/>
-    <h2>Únete a nuestra comunidad</h2><p>{needsEnrollment?'Tu cuenta está pendiente de completar su acceso.':viewer?'Tu cuenta se encuentra en revisión.':'Solicita acceso para conocer los sorteos y apoyar a nuestros proyectos.'}</p>
+    <h2>Únete a nuestra comunidad</h2><p>{needsEnrollment?'Tu cuenta está pendiente de completar su acceso.':viewer?'Tu cuenta se encuentra en revisión.':'Solicita acceso para conocer las actividades privadas del Grupo 4. La participación está sujeta a tu aprobación.'}</p>
     <button className="primary" onClick={()=>needsEnrollment?show('setup'):viewer?setAuth('login'):openApplication()}>{needsEnrollment?'Activar cuenta':'Solicitar acceso'} <ArrowRight size={17}/></button>
    </div></section>}
    {access&&canPublish(viewer)&&<section className="cta-panel"><div className="cta-ornament"><Fleur size={85}/></div>
@@ -538,9 +539,9 @@ export default function App(){
   </div>:
   screen==='admin'&&viewer?.role==='admin'?<div className="inner-page"><Admin items={items} refresh={refresh} notify={notify}/></div>:null
   }</main>
-  <footer className="footer"><div className="footer-top"><div className="footer-brand"><div className="logo-mark"><Fleur size={27}/></div><div><b>SCOUTAPOYA <span>CHN</span></b><p>La comunidad que comparte y crece.</p></div></div>
+  <footer className="footer"><div className="footer-top"><div className="footer-brand"><div className="logo-mark"><Fleur size={27}/></div><div><b>SCOUTAPOYA <span>CHN</span></b><p>Apoyo comunitario para el Grupo 4 de CHN.</p></div></div>
    <div className="footer-links"><button onClick={()=>show('explore')}>Inicio</button><button onClick={support}>Apoyar</button>{access&&<button onClick={()=>show('activity')}>Mi actividad</button>}</div></div>
-   <div className="footer-bottom"><span>© {new Date().getFullYear()} ScoutApoya CHN · Proyecto comunitario</span><span>Sin cobros integrados · Sorteos sujetos a autorización · Proyecto no oficial de ASMAC salvo permiso</span></div>
+   <div className="footer-bottom"><span>© {new Date().getFullYear()} ScoutApoya · Grupo 4 de Chihuahua Norte</span><span>Sin cobros integrados · Sorteos sujetos a autorización · Proyecto no oficial de ASMAC salvo permiso</span></div>
   </footer>
   {toast&&<div className={'toast'+(toast.error?' error':'')} role="status">{toast.error?<Flag size={18}/>:<CheckCircle2 size={18}/>} {toast.text}<button onClick={()=>setToast(null)} aria-label="Cerrar"><X size={16}/></button></div>}
   {application&&<Modal onClose={()=>setApplication(false)}><AccessApplication onClose={()=>setApplication(false)} notify={notify} onRegister={openApprovedRegistration}/></Modal>}

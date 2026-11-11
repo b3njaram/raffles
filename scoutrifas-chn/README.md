@@ -4,6 +4,15 @@ Apoyo comunitario voluntario y sorteos gratuitos INDEPENDIENTES para la comunida
 
 **Importante:** Cambiar el nombre rifa por donación NO elimina permisos de sorteos. ScoutApoya NO otorga entradas por donar, NO multiplica oportunidades al aportar y NO procesa dinero. Los sorteos permanecen bloqueados hasta comprobar el permiso SEGOB que corresponda.
 
+## Grupo beneficiario y acceso limitado
+
+- **Destinatario previsto de los apoyos:** Grupo 4 de Chihuahua Norte. Actualmente se registran solo **intenciones**, sin recibir ni transferir dinero; este cambio no configura cuenta bancaria, pasarela de pago ni emisión de CFDI.
+- **El catálogo y las participaciones no son públicos:** Supabase exige cuenta autenticada y aprobada. Los visitantes solo ven la bienvenida y la solicitud de acceso. La única cuenta administrativa determina qué personas aprueba o revoca.
+- **Deducibilidad:** el Grupo 4 no puede anunciar donativos deducibles por pertenecer a Scouts sin acreditar que el receptor legal de los fondos sea donataria autorizada y pueda emitir el CFDI correspondiente. Verificarlo con los responsables de la asociación y el asesor fiscal antes de habilitar cobros.
+- **Código fuente privado:** el repositorio actual `b3njaram/raffles` se encontró PUBLICO al revisar GitHub. Solo el propietario puede cambiar la visibilidad desde GitHub → Settings → General → Danger Zone → Change repository visibility → Private. La conexión con Vercel debe revisarse después.
+- Hacer privado el repositorio no elimina copias o forks públicos existentes, ni impide ver el JavaScript que el navegador descarga. La protección de datos depende de RLS, autenticación y autorizaciones del servidor.
+- Un grupo reducido de participantes y un repositorio privado no eliminan requisitos fiscales ni permisos aplicables a sorteos.
+
 ## Flujos separados
 1. Apoyar proyectos: un miembro aprobado elige un importe sugerido y categoría (Actividades, Transporte, Materiales, Formación, General). El sitio registra una INTENCIÓN, no un pago ni una donación recibida, y no genera entradas.
 2. Sorteos sin costo: el miembro elige un sorteo y, si cuenta con autorización legal vigente y cupo, solicita una única participación gratuita por persona, sin donar.

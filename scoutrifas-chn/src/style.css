@@ -180,3 +180,5 @@ main{min-height:65vh}.hero-shell{max-width:1230px;padding:0 20px;margin:22px aut
 .chm-minor{color:#756784;font-size:.85rem}
 @media(max-width:900px){.chn-support-section{margin:25px 20px;flex-wrap:wrap}.chn-support-section .primary{margin-left:0}}
 @media(max-width:580px){.chn-support-section{margin:20px 12px;gap:15px;padding:22px 17px}.chn-support-deco{width:56px;height:56px;border-radius:16px}.chn-support-deco svg{height:30px;width:30px}.chn-support-section>div:nth-child(2){flex-basis:calc(100% - 73px)}.chn-support-section .primary{width:100%}.chn-donation-amounts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.chn-beneficiary-note{margin:0;padding:11px 14px;background:#f6f0fa;color:#634a76;border-radius:11px;font-size:.9rem;line-height:1.5}
