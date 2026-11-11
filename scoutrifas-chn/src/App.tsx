@@ -2,8 +2,9 @@ import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import type {FormEvent,ReactNode} from 'react';
 import {ArrowLeft,ArrowRight,BarChart3,Check,CheckCircle2,ChevronDown,Clock3,Compass,Flag,Heart,ImagePlus,LogIn,LogOut,Menu,Mountain,Plus,Search,ShieldCheck,Sparkles,Ticket,Upload,Users,X} from 'lucide-react';
 import {backend,cloud,friendlyError,imageUrl,supabase} from './backend';
-import type {AccessRequest,Category,FreeDrawEntry,Listing,MemberType,Profile,SupportIntent,SupportPurpose} from './types';
-import {canPublish,canViewCatalogue,categories,formatId,freeDrawReady,isLive,isScoutId,money,remaining,supportPurposes} from './types';
+import type {AccessRequest,Category,Cause,CauseAcknowledgment,FreeDrawEntry,Listing,MemberType,Profile,SupportIntent} from './types';
+import {canPublish,canViewCatalogue,categories,formatId,freeDrawReady,isLive,isScoutId,money,remaining} from './types';
+import {AckPanel,CauseAdmin,CauseDetail,CauseEditor,CauseGallery} from './Causes';
 import './style.css';
 
 type Screen='explore'|'setup'|'mine'|'activity'|'profile'|'admin';
@@ -245,29 +246,6 @@ function CreateListing({user,onClose,done,notify}:{user:Profile;onClose:()=>void
   </form>
  </div>;
 }
-function SupportIntentModal({onClose,onSaved,notify}:{onClose:()=>void;onSaved:()=>void;notify:(s:string,e?:boolean)=>void}){
- const [amount,setAmount]=useState(100),[purpose,setPurpose]=useState<SupportPurpose>('General'),[note,setNote]=useState(''),[busy,setBusy]=useState(false);
- const submit=async(e:FormEvent)=>{e.preventDefault();if(busy)return;
-  setBusy(true);try{await backend.submitSupportIntent(amount,purpose,note);
-   notify('Tu intención de apoyar al Grupo 4 quedó registrada. No se realizó ningún cobro ni se te asignó participación.');
-   onSaved();onClose();
-  }catch(err){notify(friendlyError(err),true)}finally{setBusy(false)}
- };
- return <div className="auth-content"><div className="modal-brand"><span className="brand-icon"><Heart size={23}/></span><span>SCOUT<span className="brand-strong">APOYA</span> <sup>CHN</sup></span></div>
-  <h2>Apoya al Grupo 4</h2>
-  <p className="subtle">Registra una intención de apoyo destinada a los proyectos del Grupo 4 de Chihuahua Norte. <b>Este formulario no cobra dinero ni emite comprobantes fiscales.</b></p>
-  <form className="form-col" onSubmit={submit}>
-   <label>Monto que te gustaría aportar (MXN)</label>
-   <div className="chn-donation-amounts">{[50,100,200,500].map(n=><button type="button" key={n} className={amount===n?'selected':''} onClick={()=>setAmount(n)}>{money(n)}</button>)}</div>
-   <label>Otro monto<input type="number" min={20} max={100000} required step={1} value={amount} onChange={e=>setAmount(Number(e.target.value))}/></label>
-   <p className="chn-beneficiary-note"><b>Destino previsto:</b> Grupo 4 · Chihuahua Norte</p>
-   <label>Proyecto del Grupo 4<select value={purpose} onChange={e=>setPurpose(e.target.value as SupportPurpose)}>{supportPurposes.map(c=><option key={c}>{c}</option>)}</select></label>
-   <label>Mensaje (opcional)<textarea rows={2} maxLength={240} value={note} onChange={e=>setNote(e.target.value)} placeholder="¿A quién te gustaría ayudar?"/></label>
-   <div className="notice"><Heart size={18}/> Donar no es requisito para entrar a los sorteos gratuitos y no te da más participaciones. No se realizan transferencias ni cobros.</div>
-   <button className="primary full" disabled={busy} type="submit">{busy?'Guardando…':'Registrar intención de apoyar'} <Heart size={16}/></button>
-  </form>
- </div>;
-}
 function ProfilePage({person,current,onSave,notify,listings,onOpen}:{person:Profile;current:boolean;onSave:()=>Promise<void>;notify:(s:string,e?:boolean)=>void;listings:Listing[];onOpen:(l:Listing)=>void}){
  const [name,setName]=useState(person.display_name),[group,setGroup]=useState(person.group_name),[bio,setBio]=useState(person.bio),[file,setFile]=useState<File|null>(null),[busy,setBusy]=useState(false),[adult,setAdult]=useState(person.adult_attested);
  useEffect(()=>{setName(person.display_name);setGroup(person.group_name);setBio(person.bio);setFile(null);setAdult(person.adult_attested)},[person.id,person.display_name,person.group_name,person.bio,person.adult_attested]);
@@ -291,10 +269,10 @@ function ProfilePage({person,current,onSave,notify,listings,onOpen}:{person:Prof
   <div className="public-listings"><h3>Sorteos de {person.display_name.split(' ')[0]}</h3>{listings.length?<div className="cards-grid">{listings.map(l=><Card key={l.id} item={l} onOpen={()=>onOpen(l)}/>)}</div>:<p className="empty-small">Todavía no tiene publicaciones.</p>}</div>
  </section>;
 }
-function Admin({items,refresh,notify}:{items:Listing[];refresh:()=>Promise<void>;notify:(s:string,e?:boolean)=>void}){
+function Admin({items,causes,refresh,notify}:{items:Listing[];causes:Cause[];refresh:()=>Promise<void>;notify:(s:string,e?:boolean)=>void}){
  const [members,setMembers]=useState<Profile[]>([]),[applications,setApplications]=useState<AccessRequest[]>([]);
  const [entries,setEntries]=useState<FreeDrawEntry[]>([]),[pledges,setPledges]=useState<SupportIntent[]>([]);
- const [tab,setTab]=useState<'applications'|'draws'|'support'|'entries'|'members'>('applications'),[search,setSearch]=useState('');
+ const [tab,setTab]=useState<'applications'|'causes'|'draws'|'support'|'entries'|'members'>('applications'),[search,setSearch]=useState('');
  const [busy,setBusy]=useState(''),[updated,setUpdated]=useState<Date|null>(null);
  const [numbers,setNumbers]=useState<Record<string,string>>({}),[references,setReferences]=useState<Record<string,string>>({});
  const reload=useCallback(async()=>{
@@ -335,6 +313,7 @@ function Admin({items,refresh,notify}:{items:Listing[];refresh:()=>Promise<void>
   </div>
   <div className="admin-toolbar"><small>Actualización aproximada cada 15 segundos{updated?' · '+updated.toLocaleTimeString('es-MX'):''}</small><button className="secondary" onClick={()=>{void reload();void refresh()}}>Actualizar</button></div>
   <div className="tabs admin-tabs">
+   <button className={tab==='causes'?'active':''} onClick={()=>setTab('causes')}>Causas ({causes.length})</button>
    <button className={tab==='applications'?'active':''} onClick={()=>setTab('applications')}>Accesos ({applications.filter(r=>r.status==='pending').length})</button>
    <button className={tab==='draws'?'active':''} onClick={()=>setTab('draws')}>Sorteos ({items.length})</button>
    <button className={tab==='support'?'active':''} onClick={()=>setTab('support')}>Apoyos ({pledges.length})</button>
@@ -343,6 +322,7 @@ function Admin({items,refresh,notify}:{items:Listing[];refresh:()=>Promise<void>
   </div>
   <div className="admin-filter"><label className="search-field"><Search size={18}/><input aria-label="Buscar en administración" placeholder="Buscar nombre, correo o sorteo" value={search} onChange={e=>setSearch(e.target.value)}/></label>
    {tab==='support'&&<button className="secondary" type="button" onClick={exportPledges}>Exportar CSV</button>}</div>
+  {tab==='causes'&&<CauseAdmin causes={causes} onUpdate={refresh} notify={notify}/>}
   {tab==='applications'&&<div className="admin-list">{applications.filter(r=>matches(r.display_name,r.email,r.scout_id,r.status)).map(r=><div className="admin-line" key={r.id}>
    <div className="history-symbol"><Users size={22}/></div><div className="grow"><b>{r.display_name}</b><p>{r.email} · {r.member_type==='scout'?'Scout':'Simpatizante'} · {r.scout_id||r.referral_note||'Sin referencia'}</p>
     <small>{new Date(r.created_at).toLocaleDateString('es-MX')} · {r.status}</small></div>
@@ -380,28 +360,34 @@ function Admin({items,refresh,notify}:{items:Listing[];refresh:()=>Promise<void>
 }
 export default function App(){
  const setupDismissed=useRef(false);
- const [viewer,setViewer]=useState<Profile|null>(null),[needsEnrollment,setNeedsEnrollment]=useState(false),[items,setItems]=useState<Listing[]>([]),[loading,setLoading]=useState(true);
+ const [viewer,setViewer]=useState<Profile|null>(null),[needsEnrollment,setNeedsEnrollment]=useState(false),[items,setItems]=useState<Listing[]>([]),[causes,setCauses]=useState<Cause[]>([]),[loading,setLoading]=useState(true);
  const [screen,setScreen]=useState<Screen>('explore'),[profileTarget,setProfileTarget]=useState<Profile|null>(null),[selected,setSelected]=useState<Listing|null>(null);
- const [application,setApplication]=useState(false),[auth,setAuth]=useState<AuthMode|null>(null),[passwordRecovery,setPasswordRecovery]=useState(false),[creating,setCreating]=useState(false),[supportModal,setSupportModal]=useState(false);
+ const [selectedCause,setSelectedCause]=useState<Cause|null>(null),[creatingCause,setCreatingCause]=useState(false),[ack,setAck]=useState<CauseAcknowledgment|null>(null);
+ const [application,setApplication]=useState(false),[auth,setAuth]=useState<AuthMode|null>(null),[passwordRecovery,setPasswordRecovery]=useState(false),[creating,setCreating]=useState(false);
  const [menu,setMenu]=useState(false),[query,setQuery]=useState(''),[category,setCategory]=useState('Todas'),[sort,setSort]=useState('recent');
  const [myEntries,setMyEntries]=useState<FreeDrawEntry[]>([]),[mySupport,setMySupport]=useState<SupportIntent[]>([]);
  const [toast,setToast]=useState<{text:string;error:boolean}|null>(null);
  const notify=useCallback((text:string,error=false)=>setToast({text,error}),[]);
  useEffect(()=>{if(!toast)return;const id=window.setTimeout(()=>setToast(null),5500);return()=>window.clearTimeout(id)},[toast]);
- const refresh=useCallback(async()=>{const list=await backend.list();setItems(list);setSelected(current=>current?list.find(l=>l.id===current.id)||null:null)},[]);
+ const refresh=useCallback(async()=>{
+  const [list,causeList]=await Promise.all([backend.list(),backend.listCauses()]);
+  setItems(list);setCauses(causeList);
+  setSelected(current=>current?list.find(l=>l.id===current.id)||null:null);
+  setSelectedCause(current=>current?causeList.find(c=>c.id===current.id)||null:null);
+ },[]);
  const refreshUser=useCallback(async()=>{
   const person=await backend.session();
   const noProfile=!person&&cloud?await backend.isSignedIn():false;
   setViewer(person);setNeedsEnrollment(noProfile);
   if(noProfile){
-   setItems([]);setSelected(null);setMyEntries([]);setMySupport([]);
+   setItems([]);setCauses([]);setSelected(null);setSelectedCause(null);setMyEntries([]);setMySupport([]);
    if(!setupDismissed.current)setScreen(current=>current==='setup'?current:'setup');
   }else if(canViewCatalogue(person)){
-   setItems(await backend.list());
+   const [list,causeList]=await Promise.all([backend.list(),backend.listCauses()]);setItems(list);setCauses(causeList);
    if(person?.role==='admin')setScreen(current=>current==='explore'||current==='setup'?'admin':current);
    else setScreen(current=>current==='setup'?'explore':current);
   }else{
-   setItems([]);setSelected(null);setMyEntries([]);setMySupport([]);
+   setItems([]);setCauses([]);setSelected(null);setSelectedCause(null);setMyEntries([]);setMySupport([]);
    setScreen(current=>current==='setup'?'explore':current);
   }
  },[]);
@@ -439,7 +425,13 @@ export default function App(){
  };
  const support=()=>{
   if(!access){if(needsEnrollment)show('setup');else if(!viewer)openApplication();else notify('Necesitas una cuenta aprobada.',true);return;}
-  setSupportModal(true);setMenu(false);
+  setScreen('explore');setMenu(false);
+  window.setTimeout(()=>document.getElementById('causas')?.scrollIntoView({behavior:'smooth'}),30);
+ };
+ const openCauseEditor=()=>{
+  if(!viewer){openApplication();return}
+  if(!canPublish(viewer)){notify('Esta cuenta no puede proponer causas.',true);return}
+  setCreatingCause(true);
  };
  const openCreate=()=>{
   if(!viewer){openApplication();return}
@@ -447,21 +439,21 @@ export default function App(){
   setCreating(true)
  };
  const viewProfile=(profile:Profile)=>{setProfileTarget(profile);setScreen('profile');setSelected(null);window.scrollTo({top:0,behavior:'smooth'})};
- const logout=async()=>{try{await backend.logout();setupDismissed.current=false;setViewer(null);setNeedsEnrollment(false);setItems([]);setSelected(null);setMyEntries([]);setMySupport([]);setScreen('explore');notify('Sesión cerrada.')}catch(err){notify(friendlyError(err),true)}};
+ const logout=async()=>{try{await backend.logout();setupDismissed.current=false;setViewer(null);setNeedsEnrollment(false);setItems([]);setCauses([]);setSelected(null);setSelectedCause(null);setMyEntries([]);setMySupport([]);setScreen('explore');notify('Sesión cerrada.')}catch(err){notify(friendlyError(err),true)}};
  const mine=access?items.filter(l=>l.owner_id===viewer?.id):[];
  const live=items.filter(isLive).length;
  return <>
   <header className="site-header"><div className="nav-container">
    <button className="logo" onClick={()=>show('explore')} aria-label="ScoutApoya inicio"><span className="logo-mark"><Fleur size={29}/></span><span className="logo-name">SCOUT<span>APOYA</span><small>GRUPO 4 · CHN</small></span></button>
    <nav className={menu?'nav-links open':'nav-links'}>
-    <button className={screen==='explore'?'nav-active':''} onClick={()=>show('explore')}>Inicio y sorteos</button>
-    <button onClick={support}>Apoyar proyectos</button>
+    <button className={screen==='explore'?'nav-active':''} onClick={()=>show('explore')}>Inicio</button>
+    <button onClick={support}>Causas</button>
     {access&&canPublish(viewer)&&<button className={screen==='mine'?'nav-active':''} onClick={()=>show('mine')}>Mis sorteos</button>}
     {access&&<button className={screen==='activity'?'nav-active':''} onClick={()=>show('activity')}>Mi actividad</button>}
     {access&&viewer?.role==='admin'&&<button className={screen==='admin'?'nav-active':''} onClick={()=>show('admin')}>Administración</button>}
    </nav>
    <div className="nav-right">
-    {canPublish(viewer)&&<button className="create-nav" onClick={openCreate}><Plus size={18}/> Crear sorteo</button>}
+    {canPublish(viewer)&&<button className="create-nav" onClick={openCauseEditor}><Plus size={18}/> Crear causa</button>}
     {viewer?<button className="account" onClick={()=>viewProfile(viewer)}><Avatar user={viewer} size={34}/><span>{viewer.display_name.split(' ')[0]}</span><ChevronDown size={15}/></button>:
      needsEnrollment?<button className="sign-in" onClick={()=>show('setup')}>Activar cuenta</button>:
      cloud?<button className="sign-in" onClick={()=>setAuth('login')}><LogIn size={17}/> Iniciar sesión</button>:null}
@@ -472,7 +464,7 @@ export default function App(){
     <div className="hero-content"><span className="hero-label">⚜ GRUPO 4 · CHIHUAHUA NORTE</span>
      <h1>Una buena acción<br/>puede cambiar <em>vidas.</em></h1>
      <p>Apoya las actividades del Grupo 4 de Chihuahua Norte. También puedes explorar sorteos gratuitos e independientes: <b>no necesitas donar para participar.</b></p>
-     <div className="hero-actions"><button className="hero-primary" onClick={support}><Heart size={18}/> Quiero apoyar</button>
+     <div className="hero-actions"><button className="hero-primary" onClick={support}><Heart size={18}/> Ver causas</button>
       <button className="hero-secondary" onClick={()=>access?document.getElementById('explorar')?.scrollIntoView({behavior:'smooth'}):needsEnrollment?show('setup'):openApplication()}>Explorar sorteos <ArrowRight size={18}/></button>
      </div></div><div className="hero-stamp"><Fleur size={27}/><span>SIEMPRE<br/>LISTOS</span></div>
    </section></div>
@@ -486,8 +478,14 @@ export default function App(){
     <div><span className="kicker">TU APOYO DEJA HUELLA</span><h2>Impulsa proyectos del Grupo 4</h2>
      <p>Materiales, transporte, formación y actividades del Grupo 4 de Chihuahua Norte. Elige qué proyecto te interesa apoyar, sin obligación de compra.</p>
      <p className="chn-independence">Las donaciones nunca compran boletos ni generan oportunidades de ganar. Esta página no procesa pagos.</p></div>
-    <button className="primary" onClick={support}>Quiero apoyar <Heart size={18}/></button>
+    <button className="primary" onClick={support}>Explorar causas <Heart size={18}/></button>
    </section>
+   {access&&<section className="explore-section" id="causas">
+    <div className="section-title"><div><span className="kicker">APOYA A GRUPO 4 · CHIHUAHUA NORTE</span><h2>Causas de nuestra comunidad <span>♥</span></h2>
+     <p>Elige la causa que te interese. Cada organizador establece el monto fijo de apoyo y puedes registrar varias intenciones, sin cobro automático.</p>
+    </div>{canPublish(viewer)&&<button className="primary" onClick={openCauseEditor}><Plus size={18}/> Proponer causa</button>}</div>
+    <CauseGallery causes={causes} onOpen={setSelectedCause}/>
+   </section>}
    {access?<section className="explore-section" id="explorar">
     <div className="section-title"><div><span className="kicker">ACTIVIDADES DE LA COMUNIDAD</span><h2>Sorteos gratuitos <span>✦</span></h2>
      <p>Elige el sorteo que te interese. Participar es independiente de cualquier aporte y solo se habilita con autorización correspondiente.</p>
@@ -517,10 +515,14 @@ export default function App(){
     <div className="empty"><Ticket size={38}/><h3>Aún no organizas sorteos</h3><button className="primary" onClick={openCreate}>Crear uno</button></div>}
   </section>:
   screen==='activity'?<section className="inner-page">
-   <div className="section-title"><div><span className="kicker">TU PARTICIPACIÓN</span><h2>Mis apoyos y sorteos</h2><p>Los apoyos y las participaciones se registran por separado.</p></div><Heart size={40} className="page-icon"/></div>
+   <div className="section-title"><div><span className="kicker">TU PARTICIPACIÓN</span><h2>Mis causas y sorteos</h2><p>Los apoyos y las participaciones se registran por separado.</p></div><Heart size={40} className="page-icon"/></div>
    <div className="activity-grid">
     <div className="activity-block"><h3><Heart size={20}/> Intenciones de apoyo <span>{mySupport.length}</span></h3>
-     {mySupport.length?mySupport.map(p=><div className="activity-row" key={p.id}><b>{p.purpose} · {money(p.amount)}</b><small>Solo intención de apoyo · No cobrada · {new Date(p.created_at).toLocaleDateString('es-MX')}</small></div>):
+     {mySupport.length?mySupport.map(p=><div className="activity-row" key={p.id}>
+       <b>{causes.find(c=>c.id===p.cause_id)?.title||p.purpose} · {money(p.amount)}</b>
+       <small>Intención no cobrada · {new Date(p.created_at).toLocaleDateString('es-MX')}</small>
+       <button type="button" className="chn-cause-history-action" onClick={()=>setAck({intent_id:p.id,ack_no:p.acknowledgment_no,amount_mxn:p.amount,cause_title:causes.find(c=>c.id===p.cause_id)?.title||'Apoyo al Grupo 4',issued_at:p.created_at})}>Ver acuse #{p.acknowledgment_no}</button>
+      </div>):
       <p className="empty-small">Aún no registras apoyos. Este sitio no realiza cobros.</p>}
      <button className="secondary" onClick={support}>Quiero apoyar</button>
     </div>
@@ -537,7 +539,7 @@ export default function App(){
     listings={items.filter(l=>l.owner_id===(profileTarget||viewer)?.id&&(l.status==='active'||l.status==='finished'||viewer?.id===l.owner_id))} onOpen={setSelected}/>
    {viewer?.id===(profileTarget||viewer)?.id&&<button className="text-logout" onClick={()=>{void logout()}}><LogOut size={16}/> Cerrar sesión</button>}
   </div>:
-  screen==='admin'&&viewer?.role==='admin'?<div className="inner-page"><Admin items={items} refresh={refresh} notify={notify}/></div>:null
+  screen==='admin'&&viewer?.role==='admin'?<div className="inner-page"><Admin items={items} causes={causes} refresh={refresh} notify={notify}/></div>:null
   }</main>
   <footer className="footer"><div className="footer-top"><div className="footer-brand"><div className="logo-mark"><Fleur size={27}/></div><div><b>SCOUTAPOYA <span>CHN</span></b><p>Apoyo comunitario para el Grupo 4 de CHN.</p></div></div>
    <div className="footer-links"><button onClick={()=>show('explore')}>Inicio</button><button onClick={support}>Apoyar</button>{access&&<button onClick={()=>show('activity')}>Mi actividad</button>}</div></div>
@@ -547,7 +549,10 @@ export default function App(){
   {application&&<Modal onClose={()=>setApplication(false)}><AccessApplication onClose={()=>setApplication(false)} notify={notify} onRegister={openApprovedRegistration}/></Modal>}
   {passwordRecovery&&<Modal onClose={()=>setPasswordRecovery(false)}><PasswordRecovery onClose={()=>setPasswordRecovery(false)} notify={notify}/></Modal>}
   {auth&&<Modal onClose={()=>setAuth(null)}><Authentication mode={auth} setMode={setAuth} onClose={()=>setAuth(null)} onSuccess={async()=>{setupDismissed.current=false;await refreshUser()}} notify={notify} onApply={openApplication}/></Modal>}
-  {supportModal&&access&&<Modal onClose={()=>setSupportModal(false)}><SupportIntentModal onClose={()=>setSupportModal(false)} onSaved={()=>{if(screen==='activity')void Promise.all([backend.freeEntries(viewer!.id),backend.supportIntents(viewer!.id)]).then(([x,y])=>{setMyEntries(x);setMySupport(y)}).catch(()=>{})}} notify={notify}/></Modal>}
+
+  {ack&&<Modal width="620px" onClose={()=>setAck(null)}><AckPanel data={ack} onClose={()=>setAck(null)}/></Modal>}
+  {selectedCause&&access&&<Modal width="920px" onClose={()=>setSelectedCause(null)}><CauseDetail cause={selectedCause} onClose={()=>setSelectedCause(null)} onUpdated={refresh} notify={notify} onAcknowledged={result=>{setAck(result);if(viewer)void backend.supportIntents(viewer.id).then(setMySupport).catch(()=>{})}}/></Modal>}
+  {creatingCause&&viewer&&<Modal width="850px" onClose={()=>setCreatingCause(false)}><CauseEditor user={viewer} onClose={()=>setCreatingCause(false)} onSaved={refresh} notify={notify}/></Modal>}
   {creating&&viewer&&<Modal width="850px" onClose={()=>setCreating(false)}><CreateListing user={viewer} onClose={()=>setCreating(false)} done={refresh} notify={notify}/></Modal>}
   {selected&&access&&<Modal width="880px" onClose={()=>setSelected(null)}><Detail item={selected} user={viewer} onClose={()=>setSelected(null)} onLogin={()=>setAuth('login')} refresh={refresh} notify={notify} onProfile={viewProfile}/></Modal>}
  </>;
