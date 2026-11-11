@@ -2,6 +2,19 @@
 
 Plataforma privada para **causas auténticas de apoyo comunitario**. Los participantes solamente pueden crear y consultar intenciones de apoyo a proyectos del Grupo 4, sujetas a aprobación previa del único administrador.
 
+
+## Cupos y aprobación individual de intenciones
+
+Cada causa tiene un **máximo de intenciones**, fijado por el organizador al crearla (1 a 100,000). Una barra de progreso muestra \`registradas / límite\`, tanto en las tarjetas como en los detalles y la administración. Los registros pendientes y los aprobados utilizan cupo; si se rechaza una intención, se libera un espacio y disminuye el total de importes previstos.
+
+Un miembro aprobado puede dirigir su intención al **organizador**, al **administrador** o a **otra cuenta de usuario aprobada**. El sistema guarda únicamente la identidad de la cuenta de ScoutApoya elegida; **no almacena datos bancarios, no transfiere fondos y no confirma dinero recibido**.
+
+Al registrarla se crea inmediatamente un **acuse único con folio** (por ejemplo, \`G4-00010001\`) y estado **Pendiente de aprobación**. Únicamente el administrador único puede marcar cada intención como **Aprobada** o **Rechazada**. Esa aprobación valida el registro administrativo, no un pago. Las intenciones rechazadas conservan su folio en el historial pero dejan de ocupar cupo. Los folios no se reutilizan.
+
+Las operaciones del servidor usan bloqueo de fila \`FOR UPDATE\` para evitar sobreventa de cupo por solicitudes simultáneas; el cliente no puede manipular directamente los estados, contadores o folios. El acceso sigue sujeto a aprobación y la aplicación no tiene pagos, facturas ni CFDI integrados.
+
+Migración: \`supabase/migrations/20261110235500_intention_limits_and_review.sql\`.
+
 ## Funciones activas
 
 - Solicitud de acceso y aprobación administrativa antes de registrar una cuenta.

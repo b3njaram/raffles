@@ -65,3 +65,18 @@
  .chn-ack-print{position:fixed!important;top:0;left:0;width:100%!important;max-width:100%;border:0!important;border-radius:0!important;box-shadow:none!important}
  .chn-ack-actions{display:none!important}
 }
+
+/* Cupo de intenciones y revisión manual (no pagos) */
+.chn-intentions-progress{width:100%;height:11px;border-radius:999px;overflow:hidden;background:#e8dfea;margin:11px 0 5px}
+.chn-intentions-progress>span{height:100%;display:block;min-width:0;background:linear-gradient(90deg,#704e95,#289a75);border-radius:999px;transition:width .2s ease}
+.chn-intentions-progress-large{height:16px;margin:15px 0 5px}
+.chn-intentions-caption{color:#73647a;font-size:.76rem;line-height:1.5;display:block;margin:4px 0 12px}
+.chn-intentions-detail{font-weight:650;color:#59486d;font-size:.82rem;margin:6px 0 13px}
+.chn-cause-card .chn-intentions-progress{margin-top:12px}
+.chn-cause-card .chn-intentions-caption{font-size:.73rem}
+.chn-cause-detail select{width:100%}
+.chn-cause-editor .chn-intentions-progress{margin-bottom:0}
+.chn-cause-editor label small{display:block;margin:5px 0 0;color:#7d6988;font-size:.76rem;line-height:1.5}
+.chn-ack-print .chn-ack-details{font-size:.83rem}
+.admin-view .admin-actions{display:flex;gap:7px;flex-wrap:wrap}
+.admin-view .admin-actions button{white-space:nowrap}
