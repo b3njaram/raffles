@@ -10,23 +10,28 @@ export interface Profile {
 export interface Cause {
  id:string;owner_id:string;owner?:Profile;title:string;description:string;category:Category;
  image_paths:string[];fixed_support_amount:number;target_amount:number;end_at:string;
- status:CauseStatus;intention_count:number;intention_total:number;created_at:string;
+ status:CauseStatus;intention_count:number;intention_total:number;max_intentions:number;created_at:string;
 }
 export interface CauseDraft {
- title:string;description:string;category:Category;endAt:string;amount:number;target:number;
+ title:string;description:string;category:Category;endAt:string;amount:number;target:number;maxIntentions:number;
 }
 export interface CauseAcknowledgment {
  intent_id:string;ack_no:number;amount_mxn:number;cause_title:string;issued_at:string;
+ intent_status:'pending'|'approved'|'rejected';recipient_id:string;recipient_name:string;
 }
 export interface AccessRequest {
  id:string;email:string;display_name:string;member_type:MemberType;scout_id:string|null;
  group_name:string;referral_note:string;adult_attested:boolean;
  status:'pending'|'approved'|'rejected'|'consumed';created_at:string;reviewed_at:string|null;reviewed_by:string|null;
 }
+export interface RecipientOption {id:string;display_name:string;role:'admin'|'member'}
+export const intentionProgress=(c:Pick<Cause,'intention_count'|'max_intentions'>)=>
+ Math.min(100,Math.max(0,Math.round(100*c.intention_count/Math.max(1,c.max_intentions))));
 export type SupportPurpose='Actividades'|'Transporte'|'Materiales'|'Formación'|'General';
 export interface SupportIntent {
  id:string;user_id:string;amount:number;purpose:SupportPurpose;note:string;
- status:'intent';created_at:string;cause_id:string|null;acknowledgment_no:number;
+ status:'intent'|'pending'|'approved'|'rejected';created_at:string;cause_id:string|null;acknowledgment_no:number;
+ recipient_id:string|null;recipient_name:string|null;reviewed_at:string|null;reviewed_by:string|null;
 }
 export const formatId=(value:string)=>value.trim().toUpperCase().replace(/\s/g,'');
 export const isScoutId=(v:string|null|undefined)=>/^CHN-?[A-Z0-9]{4,12}$/.test(formatId(v||''));

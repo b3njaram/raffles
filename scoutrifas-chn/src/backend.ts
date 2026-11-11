@@ -1,5 +1,5 @@
 import {createClient} from '@supabase/supabase-js';
-import type {AccessRequest,Cause,CauseAcknowledgment,CauseDraft,MemberType,Profile,SupportIntent} from './types';
+import type {AccessRequest,Cause,CauseAcknowledgment,CauseDraft,MemberType,Profile,RecipientOption,SupportIntent} from './types';
 import {canViewCatalogue,isScoutId} from './types';
 
 const url=import.meta.env.VITE_SUPABASE_URL;
@@ -130,9 +130,9 @@ export const backend={
  },
  async createCause(d:CauseDraft,images:string[]):Promise<string>{
   if(images.length<1||images.length>10)throw new Error('Agrega entre 1 y 10 fotos.');
-  const r=await requireCloud().rpc('chn_create_cause',{
+  const r=await requireCloud().rpc('chn_create_cause_v2',{
    p_title:d.title,p_description:d.description,p_category:d.category,
-   p_end_at:d.endAt,p_amount:d.amount,p_target:d.target,p_images:images
+   p_end_at:d.endAt,p_amount:d.amount,p_target:d.target,p_limit:d.maxIntentions,p_images:images
   });
   if(r.error)throw r.error;return String(r.data);
  },
@@ -140,12 +140,20 @@ export const backend={
   const r=await requireCloud().rpc('chn_review_cause',{p_cause:id,p_action:action});
   if(r.error)throw r.error;
  },
- async registerCauseIntent(id:string,note:string):Promise<CauseAcknowledgment>{
-  const r=await requireCloud().rpc('chn_register_cause_intent',{p_cause:id,p_note:note});
+ async availableRecipients():Promise<RecipientOption[]>{
+  const r=await requireCloud().rpc('chn_cause_recipients');
+  if(r.error)throw r.error;return (r.data||[]) as RecipientOption[];
+ },
+ async registerCauseIntent(id:string,recipientId:string,note:string):Promise<CauseAcknowledgment>{
+  const r=await requireCloud().rpc('chn_submit_cause_intent_v2',{p_cause:id,p_recipient:recipientId,p_note:note});
   if(r.error)throw r.error;
   const record=Array.isArray(r.data)?r.data[0]:r.data;
   if(!record||typeof record.ack_no!=='number')throw new Error('No llegó el folio de confirmación.');
   return record as CauseAcknowledgment;
+ },
+ async reviewCauseIntent(id:string,approve:boolean):Promise<void>{
+  const r=await requireCloud().rpc('chn_review_cause_intent',{p_intent:id,p_approve:approve});
+  if(r.error)throw r.error;
  },
  async updateProfile(id:string,changes:Partial<Pick<Profile,'display_name'|'group_name'|'bio'|'avatar_path'>>){
   const r=await requireCloud().from('chn_profiles').update(changes).eq('id',id);
