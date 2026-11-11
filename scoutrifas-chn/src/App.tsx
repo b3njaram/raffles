@@ -2,9 +2,10 @@ import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import type {FormEvent,ReactNode} from 'react';
 import {ArrowLeft,ArrowRight,BarChart3,Check,CheckCircle2,ChevronDown,Clock3,Compass,Flag,Heart,LogIn,LogOut,Menu,Plus,Search,ShieldCheck,Upload,Users,X} from 'lucide-react';
 import {backend,cloud,friendlyError,imageUrl,supabase} from './backend';
-import type {AccessRequest,Cause,CauseAcknowledgment,MemberType,Profile,SupportIntent} from './types';
+import type {AccessRequest,Cause,MemberType,Profile,SupportIntent} from './types';
 import {ackLabel,canPublish,canViewCatalogue,formatId,isScoutId,money} from './types';
 import {AckPanel,CauseAdmin,CauseDetail,CauseEditor,CauseGallery} from './Causes';
+import type {AckDisplay} from './Causes';
 import './style.css';
 
 type Screen='explore'|'setup'|'mine'|'activity'|'profile'|'admin';
@@ -247,7 +248,7 @@ export default function App(){
  const setupDismissed=useRef(false);
  const [viewer,setViewer]=useState<Profile|null>(null),[needsEnrollment,setNeedsEnrollment]=useState(false),[causes,setCauses]=useState<Cause[]>([]),[loading,setLoading]=useState(true);
  const [screen,setScreen]=useState<Screen>('explore'),[profileTarget,setProfileTarget]=useState<Profile|null>(null),[selectedCause,setSelectedCause]=useState<Cause|null>(null);
- const [creatingCause,setCreatingCause]=useState(false),[ack,setAck]=useState<CauseAcknowledgment|null>(null);
+ const [creatingCause,setCreatingCause]=useState(false),[ack,setAck]=useState<AckDisplay|null>(null);
  const [application,setApplication]=useState(false),[auth,setAuth]=useState<AuthMode|null>(null),[passwordRecovery,setPasswordRecovery]=useState(false);
  const [menu,setMenu]=useState(false),[query,setQuery]=useState(''),[mySupport,setMySupport]=useState<SupportIntent[]>([]);
  const [toast,setToast]=useState<{text:string;error:boolean}|null>(null);
