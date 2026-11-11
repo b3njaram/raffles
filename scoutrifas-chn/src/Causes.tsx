@@ -7,7 +7,7 @@ import {ackLabel,categories,causeIsActive,intentionProgress,money,remaining} fro
 import './causes.css';
 
 type Notify=(message:string,isError?:boolean)=>void;
-export type AckDisplay={ack_no:number;amount_mxn:number;cause_title:string;issued_at:string;intent_status?:'intent'|'pending'|'approved'|'rejected';recipient_name?:string|null};
+export type AckDisplay={intent_id?:string;ack_no:number;amount_mxn:number;cause_title:string;issued_at:string;intent_status?:'intent'|'pending'|'approved'|'rejected';recipient_name?:string|null};
 
 export function CauseGallery({causes,onOpen,includeDrafts=false}:{causes:Cause[];onOpen:(cause:Cause)=>void;includeDrafts?:boolean}){
  const approved=includeDrafts?causes:causes.filter(c=>c.status==='active'||c.status==='finished');
