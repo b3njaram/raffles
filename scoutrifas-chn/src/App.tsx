@@ -3,7 +3,7 @@ import type {FormEvent,ReactNode} from 'react';
 import {ArrowLeft,ArrowRight,BarChart3,Check,CheckCircle2,ChevronDown,Clock3,Compass,Flag,Heart,LogIn,LogOut,Menu,Plus,Search,ShieldCheck,Upload,Users,X} from 'lucide-react';
 import {backend,cloud,friendlyError,imageUrl,supabase} from './backend';
 import type {AccessRequest,Cause,CauseAcknowledgment,MemberType,Profile,SupportIntent} from './types';
-import {canPublish,canViewCatalogue,formatId,isScoutId,money} from './types';
+import {ackLabel,canPublish,canViewCatalogue,formatId,isScoutId,money} from './types';
 import {AckPanel,CauseAdmin,CauseDetail,CauseEditor,CauseGallery} from './Causes';
 import './style.css';
 
@@ -171,7 +171,7 @@ function ProfilePage({person,current,onSave,notify,causes,onOpen}:{person:Profil
 
 function Admin({causes,refresh,notify}:{causes:Cause[];refresh:()=>Promise<void>;notify:(s:string,e?:boolean)=>void}){
  const [members,setMembers]=useState<Profile[]>([]),[requests,setRequests]=useState<AccessRequest[]>([]),[intents,setIntents]=useState<SupportIntent[]>([]);
- const [tab,setTab]=useState<'access'|'causes'|'intents'|'users'>('access'),[query,setQuery]=useState(''),[busy,setBusy]=useState(false);
+ const [tab,setTab]=useState<'review'|'access'|'causes'|'intents'|'users'>('review'),[query,setQuery]=useState(''),[busy,setBusy]=useState(false);
  const reload=useCallback(async()=>{try{const [m,r,p]=await Promise.all([backend.members(),backend.accessRequests(),backend.supportIntents()]);
   setMembers(m);setRequests(r);setIntents(p)}catch(err){notify(friendlyError(err),true)}},[notify]);
  useEffect(()=>{void reload();const id=window.setInterval(()=>{void reload();void refresh().catch(()=>{})},20000);return()=>window.clearInterval(id)},[reload,refresh]);
@@ -182,8 +182,8 @@ function Admin({causes,refresh,notify}:{causes:Cause[];refresh:()=>Promise<void>
   catch(err){notify(friendlyError(err),true)}finally{setBusy(false)}};
  const csv=()=>{
   const csvCell=(v:unknown)=>'"'+String(v??'').replace(/"/g,'""').replace(/^[=+\-@]/,"'$&")+'"';
-  const rows=[['Fecha','Folio','Usuario','Causa','Monto previsto MXN','Estado'],...intents.map(p=>[p.created_at,p.acknowledgment_no,names.get(p.user_id)||'',
-    p.cause_id?titles.get(p.cause_id)||'Causa archivada':'Apoyo anterior',p.amount,'Intención no cobrada'])];
+  const rows=[['Fecha','Folio','Usuario','Causa','Destinatario','Monto previsto MXN','Aprobación','Pago'],...intents.map(p=>[p.created_at,ackLabel(p.acknowledgment_no),names.get(p.user_id)||'',
+    p.cause_id?titles.get(p.cause_id)||'Causa archivada':'Apoyo anterior',p.recipient_name||'No especificado',p.amount,p.status,'No cobrado'])];
   const url=URL.createObjectURL(new Blob([String.fromCharCode(65279)+rows.map(r=>r.map(csvCell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));
   const a=document.createElement('a');a.href=url;a.download='causas-grupo4.csv';a.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
  };
@@ -193,11 +193,13 @@ function Admin({causes,refresh,notify}:{causes:Cause[];refresh:()=>Promise<void>
    <div className="stat"><Users/><b>{requests.filter(r=>r.status==='pending').length}</b><span>Solicitudes pendientes</span></div>
    <div className="stat"><Heart/><b>{causes.filter(c=>c.status==='pending').length}</b><span>Causas por revisar</span></div>
    <div className="stat"><CheckCircle2/><b>{members.length}</b><span>Miembros registrados</span></div>
-   <div className="stat"><Heart/><b>{intents.length}</b><span>Intenciones</span></div>
+   <div className="stat"><Heart/><b>{intents.filter(p=>p.status==='pending').length}</b><span>Intenciones por aprobar</span></div>
+   <div className="stat"><CheckCircle2/><b>{intents.filter(p=>p.status==='approved').length}</b><span>Registros aprobados</span></div>
    <div className="stat"><BarChart3/><b>{money(intents.reduce((n,p)=>n+p.amount,0))}</b><span>Previsto, no cobrado</span></div>
   </div>
   <div className="admin-toolbar"><button className="secondary" onClick={()=>{void reload();void refresh()}}>Actualizar</button></div>
   <div className="tabs admin-tabs">
+   <button className={tab==='review'?'active':''} onClick={()=>setTab('review')}>Revisar intenciones ({intents.filter(p=>p.status==='pending').length})</button>
    <button className={tab==='access'?'active':''} onClick={()=>setTab('access')}>Solicitudes</button>
    <button className={tab==='causes'?'active':''} onClick={()=>setTab('causes')}>Causas</button>
    <button className={tab==='intents'?'active':''} onClick={()=>setTab('intents')}>Apoyos</button>
@@ -205,7 +207,20 @@ function Admin({causes,refresh,notify}:{causes:Cause[];refresh:()=>Promise<void>
   </div>
   <div className="admin-filter"><label className="search-field"><Search size={18}/><input aria-label="Buscar" placeholder="Buscar nombre, correo o causa" value={query} onChange={e=>setQuery(e.target.value)}/></label>
    {tab==='intents'&&<button className="secondary" onClick={csv}>Exportar CSV</button>}</div>
-  {tab==='causes'&&<CauseAdmin causes={causes.filter(c=>match(c.title,c.owner?.display_name,c.status))} onUpdate={refresh} notify={notify}/>}
+  {tab==='review'&&<div className="admin-list">
+    {intents.filter(p=>p.status==='pending'&&match(names.get(p.user_id),p.recipient_name,p.cause_id?titles.get(p.cause_id):'',p.acknowledgment_no)).map(p=><div className="admin-line chn-history" key={p.id}>
+     <div className="history-symbol"><Heart size={20}/></div>
+     <div className="grow"><b>{ackLabel(p.acknowledgment_no)} · {titles.get(p.cause_id||'')||'Causa'}</b>
+      <p>Solicita: {names.get(p.user_id)||'Miembro'} · Destinatario: {p.recipient_name||'No especificado'}</p>
+      <small>{money(p.amount)} previsto · {new Date(p.created_at).toLocaleString('es-MX')} · Pendiente de aprobación</small>
+      {p.note&&<p>{p.note}</p>}
+     </div><div className="admin-actions">
+      <button disabled={busy} className="small-approve" type="button" onClick={()=>{void act(()=>backend.reviewCauseIntent(p.id,true),'Intención aprobada. Esto no confirma dinero recibido.')}}>Aprobar intención</button>
+      <button disabled={busy} className="danger" type="button" onClick={()=>{if(window.confirm('¿Rechazar esta intención y liberar un espacio en la causa? El folio seguirá en el historial.'))void act(()=>backend.reviewCauseIntent(p.id,false),'Intención rechazada; se liberó un espacio.')}}>Rechazar</button>
+     </div></div>)}
+     {!intents.some(p=>p.status==='pending')&&<p className="empty-small">No hay intenciones pendientes de revisión.</p>}
+   </div>}
+   {tab==='causes'&&<CauseAdmin causes={causes.filter(c=>match(c.title,c.owner?.display_name,c.status))} onUpdate={refresh} notify={notify}/>}
   {tab==='access'&&<div className="admin-list">{requests.filter(r=>match(r.display_name,r.email,r.scout_id)).map(r=><div className="admin-line" key={r.id}>
    <div className="history-symbol"><Users size={20}/></div><div className="grow"><b>{r.display_name}</b><p>{r.email} · {r.member_type==='scout'?'Scout':'Simpatizante'} · {r.scout_id||r.referral_note||'Sin referencia'}</p>
    <small>{new Date(r.created_at).toLocaleDateString('es-MX')} · {r.status}</small></div>
@@ -213,9 +228,10 @@ function Admin({causes,refresh,notify}:{causes:Cause[];refresh:()=>Promise<void>
     <button className="danger" disabled={busy} onClick={()=>{void act(()=>backend.reviewAccess(r.id,false),'Solicitud rechazada.')}}>Rechazar</button></>}
     {r.status==='approved'&&<a className="chn-email-link" href={'mailto:'+r.email+'?subject='+encodeURIComponent('ScoutApoya: acceso aprobado')+'&body='+encodeURIComponent('Tu solicitud fue aprobada. Visita '+window.location.origin+' y crea tu cuenta con el correo aprobado.')}>Preparar aviso</a>}</div>
   </div>)}{!requests.length&&<p className="empty-small">No hay solicitudes.</p>}</div>}
-  {tab==='intents'&&<div className="admin-list">{intents.filter(p=>match(names.get(p.user_id),p.cause_id?titles.get(p.cause_id):'',p.note)).map(p=><div className="admin-line chn-history" key={p.id}>
+  {tab==='intents'&&<div className="admin-list">{intents.filter(p=>match(names.get(p.user_id),p.recipient_name,p.cause_id?titles.get(p.cause_id):'',p.note)).map(p=><div className="admin-line chn-history" key={p.id}>
    <div className="history-symbol"><Heart size={20}/></div><div className="grow"><b>{names.get(p.user_id)||'Miembro'} · {p.cause_id?titles.get(p.cause_id)||'Causa archivada':'Apoyo anterior'}</b>
-    <p>Folio G4-{String(p.acknowledgment_no).padStart(8,'0')} · {new Date(p.created_at).toLocaleString('es-MX')}</p></div>
+    <p>Folio {ackLabel(p.acknowledgment_no)} · Destinatario: {p.recipient_name||'No especificado'}</p>
+    <small>{p.status==='approved'?'Aprobada':p.status==='rejected'?'Rechazada':p.status==='pending'?'Pendiente':'Registro anterior'} · {new Date(p.created_at).toLocaleString('es-MX')}</small></div>
    <strong className="history-amount">{money(p.amount)}<small style={{display:'block',fontSize:11,fontWeight:400}}>No cobrado</small></strong>
   </div>)}{!intents.length&&<p className="empty-small">Aún no hay intenciones.</p>}</div>}
   {tab==='users'&&<div className="admin-list">{members.filter(m=>match(m.display_name,m.scout_id,m.member_type)).map(m=><div className="admin-line user-line" key={m.id}>
@@ -313,7 +329,7 @@ export default function App(){
    </section>
    {access?<section className="explore-section" id="causas">
     <div className="section-title"><div><span className="kicker">APOYA AL GRUPO 4 DE CHIHUAHUA NORTE</span><h2>Causas de la comunidad <span>♥</span></h2>
-     <p>Elige una causa y registra tu intención de apoyo. Puedes hacerlo más de una vez y recibir un folio diferente en cada registro.</p></div>
+     <p>Elige una causa y solicita una intención de apoyo. Cada una tiene un folio único, cupo limitado y aprobación administrativa.</p></div>
      <div className="headline-stat"><b>{results.length}</b><span>causas visibles</span></div></div>
     <div className="filter-wrap"><div className="filter-controls"><label className="search-field"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar causas" aria-label="Buscar causas"/></label></div></div>
     {loading?<div className="empty"><Compass size={40}/> Cargando…</div>:<CauseGallery causes={results} onOpen={setSelectedCause}/>}
@@ -330,12 +346,13 @@ export default function App(){
    <ExistingMemberJoin done={refreshUser} cancel={logout} onSkip={()=>{setupDismissed.current=true;setScreen('explore')}} onApply={openApplication} notify={notify}/></div></section>:
   screen==='mine'?<section className="inner-page"><div className="section-title"><div><span className="kicker">MIS PROYECTOS</span><h2>Mis causas</h2><p>Consulta tus causas, incluidas las que están pendientes de aprobación.</p></div>
     <button className="primary" onClick={create}><Plus size={17}/> Nueva causa</button></div><CauseGallery causes={mine} includeDrafts onOpen={setSelectedCause}/></section>:
-  screen==='activity'?<section className="inner-page"><div className="section-title"><div><span className="kicker">TU COMUNIDAD</span><h2>Historial de apoyos</h2><p>Consulta los registros y descarga tus acuses de intención.</p></div><Heart size={40} className="page-icon"/></div>
+  screen==='activity'?<section className="inner-page"><div className="section-title"><div><span className="kicker">TU COMUNIDAD</span><h2>Historial de apoyos</h2><p>Consulta los folios únicos y su estado de aprobación. Ninguno acredita pagos.</p></div><Heart size={40} className="page-icon"/></div>
    <div className="activity-block"><h3><Heart size={20}/> Mis intenciones <span>{mySupport.length}</span></h3>
     {mySupport.length?mySupport.map(p=><div className="activity-row" key={p.id}>
      <b>{causes.find(c=>c.id===p.cause_id)?.title||'Apoyo al Grupo 4'} · {money(p.amount)}</b>
-     <small>Folio G4-{String(p.acknowledgment_no).padStart(8,'0')} · No cobrado · {new Date(p.created_at).toLocaleDateString('es-MX')}</small>
-     <button className="chn-cause-history-action" onClick={()=>setAck({intent_id:p.id,ack_no:p.acknowledgment_no,amount_mxn:p.amount,cause_title:causes.find(c=>c.id===p.cause_id)?.title||'Apoyo al Grupo 4',issued_at:p.created_at})}>Ver acuse</button>
+     <small>Folio {ackLabel(p.acknowledgment_no)} · {p.status==='approved'?'Aprobada':p.status==='rejected'?'Rechazada':p.status==='pending'?'Pendiente de aprobación':'Registro anterior'} · Sin pago</small>
+     <small>Destinatario: {p.recipient_name||'No especificado'} · {new Date(p.created_at).toLocaleDateString('es-MX')}</small>
+     <button className="chn-cause-history-action" onClick={()=>setAck({intent_id:p.id,ack_no:p.acknowledgment_no,amount_mxn:p.amount,cause_title:causes.find(c=>c.id===p.cause_id)?.title||'Apoyo al Grupo 4',issued_at:p.created_at,intent_status:p.status,recipient_name:p.recipient_name})}>Ver acuse numerado</button>
     </div>):<p className="empty-small">No has registrado ninguna intención de apoyo.</p>}
     <button className="secondary" onClick={explore}>Explorar causas</button>
    </div></section>:
