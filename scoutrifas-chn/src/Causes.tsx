@@ -1,6 +1,6 @@
 import {useEffect,useMemo,useState} from 'react';
 import type {FormEvent} from 'react';
-import {ArrowRight,CheckCircle2,Clock3,Heart,ImagePlus,Printer,ShieldCheck,Users,X} from 'lucide-react';
+import {ArrowRight,Clock3,Heart,ImagePlus,Printer,ShieldCheck,Users,X} from 'lucide-react';
 import {backend,friendlyError,imageUrl} from './backend';
 import type {Cause,CauseAcknowledgment,CauseDraft,Category,Profile} from './types';
 import {ackLabel,categories,causeIsActive,money,remaining} from './types';
