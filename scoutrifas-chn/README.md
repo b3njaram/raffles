@@ -1,3 +1,44 @@
+# ScoutApoya Grupo 4 · Chihuahua Norte
+
+Esta aplicación distingue **causas auténticas de apoyo comunitario** y **sorteos gratuitos**. No modifica su naturaleza ni los denomina de forma engañosa.
+
+## Causas (módulo nuevo)
+
+- Solo cuentas aprobadas pueden explorar causas y registrar intenciones.
+- Scouts aprobados pueden proponer causas con título, descripción, categoría, fecha de cierre, monto fijo sugerido y meta de apoyo. Permite **1 a 10 fotografías** por causa, máximo 5 MB cada una.
+- El administrador único aprueba, pausa o cancela la publicación.
+- Un usuario aprobado puede registrar **tantas intenciones de apoyo como desee** para la misma causa.
+- Cada intención obtiene un folio numérico global único, presentado como `G4-00010001`. La operación es transaccional: no se generan duplicados.
+- Cada usuario puede consultar su historial e imprimir **acuse de intención**, claramente rotulado **SIN PAGO, NO CFDI, NO DEDUCIBLE**. El folio nunca acredita transferencia recibida ni una compra.
+- El acumulado de la causa se calcula sobre importes **previstos** y siempre se identifica como tal, no como dinero recaudado.
+- Ninguna intención otorga entradas a sorteos, probabilidades de ganar, ni premios.
+
+## Sorteos gratuitos
+
+Los sorteos se mantienen como un flujo independiente, correctamente identificado en su propia sección, con entrada gratuita y sujeta a la autorización oficial correspondiente. No se implementan boletos pagados ni vínculos entre aportaciones y participaciones.
+
+## Donaciones pagadas y recibos fiscales
+
+Esta versión **no procesa dinero**. Para habilitar la recepción y emitir un recibo real, antes hay que definir la entidad jurídica receptora, habilitar una cuenta oficial y registrar el pago verificado. Los CFDI deducibles solo corresponden cuando los emite el receptor autorizado en las condiciones previstas por el SAT. Un número interno no sustituye un CFDI.
+
+## Seguridad
+
+- RLS en causas e intenciones: solo usuarios aprobados; registros propios o, en funciones administrativas, el único administrador.
+- Las fotos se almacenan en el bucket privado existente, con URLs temporales.
+- Todas las operaciones de escritura requieren RPC validados por identidad y rol. Los clientes no tienen permisos generales de INSERT/UPDATE sobre causas, ni pueden fabricar acuses.
+- El catálogo es cerrado por invitación y aprobación. Eso **protege privacidad**, pero no reemplaza permisos, avisos de privacidad ni obligaciones legales.
+- El repositorio actual debe hacerse **privado manualmente en GitHub**; una web Vite no es código fuente completamente oculto, pues el navegador descarga parte del cliente.
+
+Migración: `supabase/migrations/20261110223000_genuine_causes_intent_acknowledgments.sql`.
+
+## Tecnología
+
+GitHub: `b3njaram/raffles/scoutrifas-chn`; Vercel personal: `scoutrifas-chn`; Supabase compartido, tablas CHN aisladas de Study Compass. Build de validación: `npm run check`.
+
+---
+
+## Contexto y tareas previas
+
 # ScoutApoya CHN ⚜️
 
 Apoyo comunitario voluntario y sorteos gratuitos INDEPENDIENTES para la comunidad Scout Chihuahua Norte. React/Vite, Supabase y Vercel, con código en GitHub.

@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {canPublish,canRequestTickets,canViewCatalogue,defaultDraft,isScoutId,money,salesReady,calculateRaffle,defaultRafflePlan} from './types';
+import {canPublish,canRequestTickets,canViewCatalogue,defaultDraft,isScoutId,money,salesReady,calculateRaffle,defaultRafflePlan,ackLabel,causeIsActive} from './types';
 import type {Listing,Profile} from './types';
 const scout:Profile={id:'a',scout_id:'CHN-000123',member_type:'scout',adult_attested:true,display_name:'Test Scout',group_name:'',bio:'',avatar_path:null,role:'member',verified:true,created_at:''};
 const supporter:Profile={...scout,member_type:'supporter',scout_id:null,role:'member'};
@@ -33,5 +33,21 @@ describe('sorteos independientes de aportaciones',()=>{
  it('el modelo gratuito nunca requiere precio por participación',()=>{
   const draw={...listing, ticket_price:0,free_entry_authorized:false,free_entry_count:0};
   expect(draw.ticket_price).toBe(0);expect(draw.free_entry_authorized).toBe(false);
+ });
+});
+
+describe('causas reales y acuses',()=>{
+ const project={id:'x',owner_id:'member',title:'Apoyo al Grupo 4',description:'Proyecto del Grupo 4 Chihuahua Norte',
+  category:'Otros' as const,image_paths:['member/listings/photo.jpg'],fixed_support_amount:100,
+  target_amount:5000,end_at:new Date(Date.now()+86400000).toISOString(),
+  status:'active' as const,intention_count:0,intention_total:0,created_at:''};
+ it('la misma referencia se presenta en un formato único',()=>{
+  expect(ackLabel(10001)).toBe('G4-00010001');
+  expect(ackLabel(10002)).not.toBe(ackLabel(10001));
+ });
+ it('solo las causas activas y vigentes aceptan intenciones',()=>{
+  expect(causeIsActive(project)).toBe(true);
+  expect(causeIsActive({...project,status:'pending'})).toBe(false);
+  expect(causeIsActive({...project,end_at:'2020-01-01T00:00:00Z'})).toBe(false);
  });
 });
