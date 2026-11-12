@@ -10,7 +10,7 @@ import './causes.css';
 type Notify=(message:string,isError?:boolean)=>void;
 export type AckDisplay={intent_id?:string;ack_no:number;amount_value:number;currency_code:Currency;cause_title:string;issued_at:string;intent_status?:'intent'|'pending'|'approved'|'rejected';recipient_name?:string|null};
 
-export function CauseGallery({causes,onOpen,includeDrafts=false}:{causes:Cause[];onOpen:(cause:Cause)=>void;includeDrafts?:boolean}){
+export function CauseGallery({causes,onOpen,includeDrafts=false,emptyTitle,emptyDescription}:{causes:Cause[];onOpen:(cause:Cause)=>void;includeDrafts?:boolean;emptyTitle?:string;emptyDescription?:string}){
  const {t,format,language}=usePreferences();
  const approved=includeDrafts?causes:causes.filter(c=>c.status==='active'||c.status==='finished');
  return <div className="chn-causes-grid">
@@ -28,7 +28,7 @@ export function CauseGallery({causes,onOpen,includeDrafts=false}:{causes:Cause[]
     <span className="chn-cause-action">{t("Conocer la causa","Explore cause")} <ArrowRight size={17}/></span>
    </div>
   </button>)}
-  {approved.length===0&&<div className="chn-cause-empty"><Heart size={35}/><h3>{t("Próximamente: causas del Grupo 4","Group 4 causes coming soon")}</h3><p>{t("Las nuevas iniciativas aparecerán aquí cuando sean revisadas por administración.","New initiatives will appear here after administrative review.")}</p></div>}
+  {approved.length===0&&<div className="chn-cause-empty"><Heart size={35}/><h3>{emptyTitle||t("Próximamente: causas del Grupo 4","Group 4 causes coming soon")}</h3><p>{emptyDescription||t("Las nuevas iniciativas aparecerán aquí cuando sean revisadas por administración.","New initiatives will appear here after administrative review.")}</p></div>}
  </div>;
 }
 
@@ -75,7 +75,9 @@ export function CauseDetail({cause,onClose,onShare,onUpdated,onAcknowledged,noti
  const submit=async(e:FormEvent)=>{e.preventDefault();if(submitLock.current||!open)return;submitLock.current=true;setBusy(true);
   try{const result=await backend.registerCauseIntent(cause.id,recipientId,currency,note);
    notify(t('Acuse ','Acknowledgment ')+ackLabel(result.ack_no)+t(' emitido. La intención queda pendiente de aprobación; no se realizó ningún cobro.',' issued. This intention is pending approval; no payment was processed.'));
-   await onUpdated();onClose();onAcknowledged(result);
+   onClose();onAcknowledged(result);
+   // A saved intention must always show its confirmation, even if refreshing the list fails.
+   void onUpdated().catch(()=>notify(t('No se pudo actualizar la lista, pero tu folio quedó registrado.','The list could not refresh, but your reference was registered.'),true));
   }catch(err){notify(friendlyError(err),true)}finally{submitLock.current=false;setBusy(false)}
  };
  return <div className="chn-cause-detail">
