@@ -48,8 +48,9 @@ export const money=(amount:number,currency:Currency='MXN',locale:'es'|'en'='es')
 export const causeAmount=(c:Cause,currency:Currency):number|null=>currency==='USD'?c.fixed_support_amount_usd:c.fixed_support_amount;
 export const causeTotal=(c:Cause,currency:Currency):number=>currency==='USD'?c.intention_total_usd:c.intention_total;
 export const causeTarget=(c:Cause,currency:Currency):number=>currency==='USD'?c.target_amount_usd:c.target_amount;
-export const remaining=(iso:string)=>{
- const delta=new Date(iso).getTime()-Date.now();if(delta<=0)return 'Finalizó';
+export const categoryLabel=(category:Category,language:'es'|'en'='es')=>language==='es'?category:({Aventura:'Adventure',Equipo:'Equipment',Coleccionables:'Collectibles',Experiencias:'Experiences',Arte:'Art',Otros:'Other'} as Record<Category,string>)[category];
+export const remaining=(iso:string,language:'es'|'en'='es')=>{
+ const delta=new Date(iso).getTime()-Date.now();if(delta<=0)return language==='en'?'Ended':'Finalizó';
  const days=Math.floor(delta/86400000),hours=Math.floor(delta%86400000/3600000);
- return days?days+' d '+hours+' h':hours?hours+' h '+Math.floor(delta%3600000/60000)+' min':Math.max(1,Math.ceil(delta/60000))+' min';
+ return days?days+(language==='en'?'d ':' d ')+hours+'h':hours?hours+'h '+Math.floor(delta%3600000/60000)+'m':Math.max(1,Math.ceil(delta/60000))+(language==='en'?'m':' min');
 };

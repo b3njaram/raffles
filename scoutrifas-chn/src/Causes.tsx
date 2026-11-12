@@ -3,7 +3,7 @@ import type {FormEvent} from 'react';
 import {ArrowRight,Clock3,Heart,ImagePlus,Printer,ShieldCheck,Users,X} from 'lucide-react';
 import {backend,friendlyError,imageUrl} from './backend';
 import type {Cause,CauseAcknowledgment,CauseDraft,Category,Currency,Profile,RecipientOption} from './types';
-import {ackLabel,categories,causeAmount,causeIsActive,causeTarget,causeTotal,intentionProgress,remaining} from './types';
+import {ackLabel,categories,categoryLabel,causeAmount,causeIsActive,causeTarget,causeTotal,intentionProgress,remaining} from './types';
 import {usePreferences} from './Preferences';
 import './causes.css';
 
@@ -11,17 +11,17 @@ type Notify=(message:string,isError?:boolean)=>void;
 export type AckDisplay={intent_id?:string;ack_no:number;amount_value:number;currency_code:Currency;cause_title:string;issued_at:string;intent_status?:'intent'|'pending'|'approved'|'rejected';recipient_name?:string|null};
 
 export function CauseGallery({causes,onOpen,includeDrafts=false}:{causes:Cause[];onOpen:(cause:Cause)=>void;includeDrafts?:boolean}){
- const {t,format}=usePreferences();
+ const {t,format,language}=usePreferences();
  const approved=includeDrafts?causes:causes.filter(c=>c.status==='active'||c.status==='finished');
  return <div className="chn-causes-grid">
   {approved.map(c=><button key={c.id} type="button" className="chn-cause-card" onClick={()=>onOpen(c)}>
    <div className="chn-cause-cover">{c.image_paths[0]&&imageUrl(c.image_paths[0])?<img loading="lazy" src={imageUrl(c.image_paths[0])} alt={c.title}/>:<span className="chn-cause-cover-fallback"><Heart size={42}/></span>}
     <span className="chn-cause-tag"><Heart size={14}/> {c.status==='pending'?t('En revisión','In review'):c.status==='paused'?t('Pausada','Paused'):c.status==='cancelled'?t('Cancelada','Cancelled'):t('Causa comunitaria','Community cause')}</span>
    </div>
-   <div className="chn-cause-copy"><span className="chn-cause-category">{c.category} · Grupo 4 CHN</span>
+   <div className="chn-cause-copy"><span className="chn-cause-category">{categoryLabel(c.category,language)} · {t('Grupo 4 CHN','Group 4 CHN')}</span>
     <h3>{c.title}</h3><p>{c.description}</p>
     <div className="chn-cause-amount"><span>{t("Apoyo sugerido por registro","Suggested support per entry")}</span><strong>{format(c.fixed_support_amount,'MXN')}{c.fixed_support_amount_usd!=null&&<> · {format(c.fixed_support_amount_usd,'USD')}</>}</strong></div>
-    <div className="chn-cause-meta"><span><Users size={15}/> {c.intention_count} / {c.max_intentions} intenciones</span><span><Clock3 size={15}/> {remaining(c.end_at)}</span></div>
+    <div className="chn-cause-meta"><span><Users size={15}/> {c.intention_count} / {c.max_intentions} intenciones</span><span><Clock3 size={15}/> {remaining(c.end_at,language)}</span></div>
     <div className="chn-intentions-progress" role="progressbar" aria-label={'Intenciones de '+c.title} aria-valuenow={c.intention_count} aria-valuemin={0} aria-valuemax={c.max_intentions}>
      <span style={{width:intentionProgress(c)+'%'}}/>
     </div><small className="chn-intentions-caption">{c.intention_count>=c.max_intentions?t('Cupo completo','Capacity reached'):c.max_intentions-c.intention_count+' espacios disponibles'}</small>
@@ -53,7 +53,7 @@ export function AckPanel({data,onClose}:{data:AckDisplay;onClose:()=>void}){
 }
 
 export function CauseDetail({cause,onClose,onUpdated,onAcknowledged,notify}:{cause:Cause;onClose:()=>void;onUpdated:()=>Promise<void>;onAcknowledged:(d:CauseAcknowledgment)=>void;notify:Notify}){
- const {t,format}=usePreferences();
+ const {t,format,language}=usePreferences();
  const [currency,setCurrency]=useState<Currency>('MXN');
  const [photo,setPhoto]=useState(0),[note,setNote]=useState(''),[busy,setBusy]=useState(false);
  const [recipients,setRecipients]=useState<RecipientOption[]>([]),[recipientId,setRecipientId]=useState(cause.owner_id);
@@ -80,7 +80,7 @@ export function CauseDetail({cause,onClose,onUpdated,onAcknowledged,notify}:{cau
    <span className="kicker">{t("CAUSA PARA EL GRUPO 4","CAUSE FOR GROUP 4")}</span><h2>{cause.title}</h2>
    <p className="chn-cause-description">{cause.description}</p>
    <div className="chn-cause-amount-box"><span>{t("Monto fijado por el organizador para cada intención","Amount set by the organizer for each intention")}</span><strong>{format(cause.fixed_support_amount,'MXN')}{cause.fixed_support_amount_usd!=null&&<> / {format(cause.fixed_support_amount_usd,'USD')}</>}</strong><small>{t("Puedes registrar varias intenciones mientras haya cupo disponible. No hay cobros en esta página.","You may register multiple intentions while capacity remains. No payments are collected here.")}</small></div>
-   <div className="chn-cause-metrics"><span><Heart size={16}/> {cause.intention_count} / {cause.max_intentions} intenciones registradas</span><span><Clock3 size={16}/> {remaining(cause.end_at)}</span></div>
+   <div className="chn-cause-metrics"><span><Heart size={16}/> {cause.intention_count} / {cause.max_intentions} intenciones registradas</span><span><Clock3 size={16}/> {remaining(cause.end_at,language)}</span></div>
    <div className="chn-intentions-progress chn-intentions-progress-large" role="progressbar" aria-label={t("Cupo de intenciones","Intention capacity")} aria-valuenow={cause.intention_count} aria-valuemin={0} aria-valuemax={cause.max_intentions}>
     <span style={{width:intentionProgress(cause)+'%'}}/>
    </div>
@@ -113,7 +113,7 @@ export function CauseDetail({cause,onClose,onUpdated,onAcknowledged,notify}:{cau
 }
 
 export function CauseEditor({user,onClose,onSaved,notify}:{user:Profile;onClose:()=>void;onSaved:()=>Promise<void>;notify:Notify}){
- const {t}=usePreferences();
+ const {t,language}=usePreferences();
  const [draft,setDraft]=useState<CauseDraft>({title:'',description:'',category:'Aventura',endAt:'',amount:100,amountUsd:10,target:3000,targetUsd:300,maxIntentions:100});
  const [photos,setPhotos]=useState<File[]>([]),[busy,setBusy]=useState(false);
  const preview=useMemo(()=>photos.map(file=>({name:file.name,url:URL.createObjectURL(file)})),[photos]);
@@ -144,7 +144,7 @@ export function CauseEditor({user,onClose,onSaved,notify}:{user:Profile;onClose:
   <form className="form-col" onSubmit={submit}>
    <label>{t("Nombre de la causa","Cause title")}<input required minLength={5} maxLength={110} value={draft.title} onChange={e=>change('title',e.target.value)} placeholder={t("Ej. Transporte para campamento","E.g., camp transportation")}/></label>
    <label>{t("¿Para qué se usarían los recursos?","How would the funds be used?")}<textarea required minLength={20} maxLength={2500} rows={4} value={draft.description} onChange={e=>change('description',e.target.value)} placeholder={t("Describe el proyecto y cómo beneficiaría al Grupo 4.","Describe your project and how it helps Group 4.")}/></label>
-   <div className="two-fields"><label>{t("Categoría","Category")}<select value={draft.category} onChange={e=>change('category',e.target.value as Category)}>{categories.map(c=><option key={c}>{c}</option>)}</select></label>
+   <div className="two-fields"><label>{t("Categoría","Category")}<select value={draft.category} onChange={e=>change('category',e.target.value as Category)}>{categories.map(c=><option key={c} value={c}>{categoryLabel(c,language)}</option>)}</select></label>
     <label>{t("Cierre de la causa","Cause closing date")}<input required type="datetime-local" value={draft.endAt} onChange={e=>change('endAt',e.target.value)}/></label></div>
    <div className="two-fields"><label>{t("Importe por intención (MXN)","Amount per intention (MXN)")}<input required type="number" min={20} max={100000} step={1} value={draft.amount} onChange={e=>change('amount',Number(e.target.value))}/></label>
     <label>{t("Meta prevista (MXN)","Target amount (MXN)")}<input required type="number" min={0} max={100000000} step={1} value={draft.target} onChange={e=>change('target',Number(e.target.value))}/></label></div>
@@ -175,7 +175,7 @@ export function CauseAdmin({causes,onUpdate,notify}:{causes:Cause[];onUpdate:()=
  };
  return <div className="admin-list">
   {causes.map(c=><div className="admin-line" key={c.id}><img src={imageUrl(c.image_paths[0])} alt=""/>
-   <div className="grow"><b>{c.title}</b><p>{c.owner?.display_name||'Organizador'} · {format(c.fixed_support_amount,'MXN')} / {c.fixed_support_amount_usd==null?'USD —':format(c.fixed_support_amount_usd,'USD')} {t('por intención','per intention')} · {c.status}</p>
+   <div className="grow"><b>{c.title}</b><p>{c.owner?.display_name||'Organizador'} · {format(c.fixed_support_amount,'MXN')} / {c.fixed_support_amount_usd==null?'USD —':format(c.fixed_support_amount_usd,'USD')} {t('por intención','per intention')} · {c.status==='pending'?t('Pendiente','Pending'):c.status==='active'?t('Activa','Active'):c.status==='paused'?t('Pausada','Paused'):c.status==='cancelled'?t('Cancelada','Canceled'):t('Terminada','Ended')}</p>
     <small>{c.intention_count} / {c.max_intentions} intenciones · {format(c.intention_total,'MXN')} + {format(c.intention_total_usd,'USD')} {t('previstos, no cobrados','planned, not collected')} · {t('Meta','Goal')} {format(c.target_amount,'MXN')} / {format(c.target_amount_usd,'USD')}</small>
     <div className="chn-intentions-progress"><span style={{width:intentionProgress(c)+'%'}}/></div></div>
    <div className="admin-actions">
