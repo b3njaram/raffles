@@ -1,0 +1,8 @@
+{
+  "servers": {
+    "supabase-chn-readonly": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp?project_ref=ciarlxdhhrsrkpdkyqfi&read_only=true"
+    }
+  }
+}
