@@ -182,6 +182,7 @@ function Admin({causes,refresh,notify}:{causes:Cause[];refresh:()=>Promise<void>
  const {t,format}=usePreferences();
  const [members,setMembers]=useState<Profile[]>([]),[requests,setRequests]=useState<AccessRequest[]>([]),[intents,setIntents]=useState<SupportIntent[]>([]);
  const [tab,setTab]=useState<'review'|'access'|'causes'|'intents'|'users'>('review'),[query,setQuery]=useState(''),[busy,setBusy]=useState(false);
+ const [intentStatus,setIntentStatus]=useState<'all'|'pending'|'approved'|'rejected'>('all');
  const reload=useCallback(async()=>{try{const [m,r,p]=await Promise.all([backend.members(),backend.accessRequests(),backend.supportIntents()]);
   setMembers(m);setRequests(r);setIntents(p)}catch(err){notify(friendlyError(err),true)}},[notify]);
  useEffect(()=>{void reload();const id=window.setInterval(()=>{void reload();void refresh().catch(()=>{})},20000);return()=>window.clearInterval(id)},[reload,refresh]);
@@ -217,7 +218,9 @@ function Admin({causes,refresh,notify}:{causes:Cause[];refresh:()=>Promise<void>
    <button className={tab==='users'?'active':''} onClick={()=>setTab('users')}>{t("Usuarios","Members")}</button>
   </div>
   <div className="admin-filter"><label className="search-field"><Search size={18}/><input aria-label={t("Buscar","Search")} placeholder={t('Buscar nombre, correo o causa','Search name, email, or cause')} value={query} onChange={e=>setQuery(e.target.value)}/></label>
-   {tab==='intents'&&<button className="secondary" onClick={csv}>{t("Exportar CSV","Export CSV")}</button>}</div>
+   {tab==='intents'&&<><select className="chn-admin-status-filter" aria-label={t('Filtrar estado de intenciones','Filter intention status')} value={intentStatus} onChange={e=>setIntentStatus(e.target.value as 'all'|'pending'|'approved'|'rejected')}>
+     <option value="all">{t('Todos los estados','All statuses')}</option><option value="pending">{t('Pendientes','Pending')}</option><option value="approved">{t('Aprobadas','Approved')}</option><option value="rejected">{t('Rechazadas','Rejected')}</option>
+    </select><button className="secondary" onClick={csv}>{t("Exportar CSV","Export CSV")}</button></>}</div>
   {tab==='review'&&<div className="admin-list">
     {intents.filter(p=>p.status==='pending'&&match(names.get(p.user_id),p.recipient_name,p.cause_id?titles.get(p.cause_id):'',p.acknowledgment_no)).map(p=><div className="admin-line chn-history" key={p.id}>
      <div className="history-symbol"><Heart size={20}/></div>
@@ -239,7 +242,7 @@ function Admin({causes,refresh,notify}:{causes:Cause[];refresh:()=>Promise<void>
     <button className="danger" disabled={busy} onClick={()=>{void act(()=>backend.reviewAccess(r.id,false),'Solicitud rechazada.')}}>{t("Rechazar","Reject")}</button></>}
     {r.status==='approved'&&<a className="chn-email-link" href={'mailto:'+r.email+'?subject='+encodeURIComponent('ScoutApoya: acceso aprobado')+'&body='+encodeURIComponent('Tu solicitud fue aprobada. Visita '+window.location.origin+' y crea tu cuenta con el correo aprobado.')}>{t("Preparar aviso","Prepare email")}</a>}</div>
   </div>)}{!requests.length&&<p className="empty-small">{t("No hay solicitudes.","No applications.")}</p>}</div>}
-  {tab==='intents'&&<div className="admin-list">{intents.filter(p=>match(names.get(p.user_id),p.recipient_name,p.cause_id?titles.get(p.cause_id):'',p.note)).map(p=><div className="admin-line chn-history" key={p.id}>
+  {tab==='intents'&&<div className="admin-list">{intents.filter(p=>(intentStatus==='all'||p.status===intentStatus)&&match(names.get(p.user_id),p.recipient_name,p.cause_id?titles.get(p.cause_id):'',p.note,ackLabel(p.acknowledgment_no))).map(p=><div className="admin-line chn-history" key={p.id}>
    <div className="history-symbol"><Heart size={20}/></div><div className="grow"><b>{names.get(p.user_id)||t('Miembro','Member')} · {p.cause_id?titles.get(p.cause_id)||t('Causa archivada','Archived cause'):t('Apoyo anterior','Previous support')}</b>
     <p>{t("Folio","Reference")} {ackLabel(p.acknowledgment_no)} · {t("Destinatario:","Recipient:")} {p.recipient_name||t(t('No especificado','Not specified'),'Not specified')}</p>
     <small>{p.status==='approved'?t('Aprobada','Approved'):p.status==='rejected'?t('Rechazada','Rejected'):p.status==='pending'?t('Pendiente','Pending'):t(t('Registro anterior','Previous record'),'Previous record')} · {new Date(p.created_at).toLocaleString('es-MX')}</small></div>
@@ -390,7 +393,7 @@ export default function App(){
       <option value="newest">{t('Más recientes','Newest')}</option><option value="ending">{t('Próximas a cerrar','Ending soon')}</option><option value="most-progress">{t('Mayor progreso','Most progress')}</option><option value="spaces">{t('Más espacios','Most spaces')}</option>
      </select></label>
     </div></div>
-    {loading?<div className="empty"><Compass size={40}/> {t("Cargando…","Loading…")}</div>:<CauseGallery causes={results} onOpen={openCause}/>}
+    {loading?<div className="empty"><Compass size={40}/> {t("Cargando…","Loading…")}</div>:<CauseGallery causes={results} onOpen={openCause} emptyTitle={t('No encontramos causas con esos filtros','No causes match these filters')} emptyDescription={t('Prueba otra categoría, disponibilidad o palabra de búsqueda.','Try a different category, availability, or search term.')}/>}
     {canPublish(viewer)&&<div className="chn-create-bottom"><button className="primary" onClick={create}><Plus size={18}/> {t("Crear nueva causa","Create new cause")}</button></div>}
    </section>:<section className="explore-section private-welcome"><div className="private-welcome-inner"><Compass size={35}/>
      <h2>{t("Comunidad privada del Grupo 4","Private Group 4 community")}</h2><p>{needsEnrollment?'Tu cuenta necesita activar el acceso aprobado.':viewer?'Tu solicitud está en revisión.':'Solicita acceso para conocer nuestros proyectos y causas.'}</p>
