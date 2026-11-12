@@ -1,5 +1,5 @@
 import {createClient} from '@supabase/supabase-js';
-import type {AccessRequest,Cause,CauseAcknowledgment,CauseDraft,MemberType,Profile,RecipientOption,SupportIntent} from './types';
+import type {AccessRequest,Cause,CauseAcknowledgment,CauseDraft,Currency,MemberType,Profile,RecipientOption,SupportIntent} from './types';
 import {canViewCatalogue,isScoutId} from './types';
 
 const url=import.meta.env.VITE_SUPABASE_URL;
@@ -130,9 +130,9 @@ export const backend={
  },
  async createCause(d:CauseDraft,images:string[]):Promise<string>{
   if(images.length<1||images.length>10)throw new Error('Agrega entre 1 y 10 fotos.');
-  const r=await requireCloud().rpc('chn_create_cause_v2',{
+  const r=await requireCloud().rpc('chn_create_cause_v3',{
    p_title:d.title,p_description:d.description,p_category:d.category,
-   p_end_at:d.endAt,p_amount:d.amount,p_target:d.target,p_limit:d.maxIntentions,p_images:images
+   p_end_at:d.endAt,p_amount_mxn:d.amount,p_amount_usd:d.amountUsd,p_target_mxn:d.target,p_target_usd:d.targetUsd,p_limit:d.maxIntentions,p_images:images
   });
   if(r.error)throw r.error;return String(r.data);
  },
@@ -144,8 +144,8 @@ export const backend={
   const r=await requireCloud().rpc('chn_cause_recipients');
   if(r.error)throw r.error;return (r.data||[]) as RecipientOption[];
  },
- async registerCauseIntent(id:string,recipientId:string,note:string):Promise<CauseAcknowledgment>{
-  const r=await requireCloud().rpc('chn_submit_cause_intent_v2',{p_cause:id,p_recipient:recipientId,p_note:note});
+ async registerCauseIntent(id:string,recipientId:string,currency:Currency,note:string):Promise<CauseAcknowledgment>{
+  const r=await requireCloud().rpc('chn_submit_cause_intent_v3',{p_cause:id,p_recipient:recipientId,p_currency:currency,p_note:note});
   if(r.error)throw r.error;
   const record=Array.isArray(r.data)?r.data[0]:r.data;
   if(!record||typeof record.ack_no!=='number')throw new Error('No llegó el folio de confirmación.');
