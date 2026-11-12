@@ -2,8 +2,8 @@ import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import type {FormEvent,ReactNode} from 'react';
 import {ArrowLeft,ArrowRight,BarChart3,Check,CheckCircle2,ChevronDown,Clock3,Compass,Flag,Heart,LogIn,LogOut,Menu,Plus,Search,ShieldCheck,Upload,Users,X} from 'lucide-react';
 import {backend,cloud,friendlyError,imageUrl,supabase} from './backend';
-import type {AccessRequest,Cause,MemberType,Profile,SupportIntent} from './types';
-import {ackLabel,canPublish,canViewCatalogue,formatId,isScoutId} from './types';
+import type {AccessRequest,Category,Cause,CauseFilter,CauseSort,MemberType,Profile,SupportIntent} from './types';
+import {ackLabel,canPublish,canViewCatalogue,categories,categoryLabel,causeShareUrl,filterCauses,formatId,isScoutId,validCauseId} from './types';
 import {AckPanel,CauseAdmin,CauseDetail,CauseEditor,CauseGallery} from './Causes';
 import type {AckDisplay} from './Causes';
 import {PreferenceSwitches,usePreferences} from './Preferences';
@@ -255,13 +255,15 @@ function Admin({causes,refresh,notify}:{causes:Cause[];refresh:()=>Promise<void>
 }
 
 export default function App(){
- const {t,format}=usePreferences();
+ const {t,format,language}=usePreferences();
  const setupDismissed=useRef(false);
  const [viewer,setViewer]=useState<Profile|null>(null),[needsEnrollment,setNeedsEnrollment]=useState(false),[causes,setCauses]=useState<Cause[]>([]),[loading,setLoading]=useState(true);
  const [screen,setScreen]=useState<Screen>('explore'),[profileTarget,setProfileTarget]=useState<Profile|null>(null),[selectedCause,setSelectedCause]=useState<Cause|null>(null);
  const [creatingCause,setCreatingCause]=useState(false),[ack,setAck]=useState<AckDisplay|null>(null);
  const [application,setApplication]=useState(false),[auth,setAuth]=useState<AuthMode|null>(null),[passwordRecovery,setPasswordRecovery]=useState(false);
  const [menu,setMenu]=useState(false),[query,setQuery]=useState(''),[mySupport,setMySupport]=useState<SupportIntent[]>([]);
+ const [category,setCategory]=useState<Category|'all'>('all'),[statusFilter,setStatusFilter]=useState<CauseFilter>('all'),[sort,setSort]=useState<CauseSort>('newest');
+ const [historyQuery,setHistoryQuery]=useState(''),[historyStatus,setHistoryStatus]=useState<'all'|'pending'|'approved'|'rejected'>('all');
  const [toast,setToast]=useState<{text:string;error:boolean}|null>(null);
  const notify=useCallback((text:string,error=false)=>setToast({text,error}),[]);
  useEffect(()=>{if(!toast)return;const id=window.setTimeout(()=>setToast(null),5500);return()=>window.clearTimeout(id)},[toast]);
@@ -286,8 +288,41 @@ export default function App(){
   return()=>{active=false};
  },[screen,viewer?.id,causes,notify]);
  const access=canViewCatalogue(viewer);
- const results=useMemo(()=>causes.filter(c=>(c.status==='active'||c.status==='finished')
-  &&(!query.trim()||(c.title+' '+c.description+' '+c.category).toLowerCase().includes(query.toLowerCase()))),[causes,query]);
+ const results=useMemo(()=>filterCauses(causes,{query,category,status:statusFilter,sort}),[causes,query,category,statusFilter,sort]);
+ const filteredSupport=useMemo(()=>mySupport.filter(p=>{
+  if(historyStatus!=='all'&&p.status!==historyStatus)return false;
+  const haystack=[ackLabel(p.acknowledgment_no),p.currency_code,p.amount,p.recipient_name,
+    causes.find(c=>c.id===p.cause_id)?.title||''].join(' ').toLocaleLowerCase();
+  return haystack.includes(historyQuery.trim().toLocaleLowerCase());
+ }),[mySupport,historyStatus,historyQuery,causes]);
+ useEffect(()=>{
+  const route=()=>{
+   const id=new URL(window.location.href).searchParams.get('causa');
+   if(!validCauseId(id)){setSelectedCause(null);return}
+   if(!canViewCatalogue(viewer))return;
+   const found=causes.find(c=>c.id===id&&(c.status==='active'||c.status==='finished'||viewer?.role==='admin'||c.owner_id===viewer?.id));
+   setSelectedCause(found||null);
+  };
+  route();window.addEventListener('popstate',route);return()=>window.removeEventListener('popstate',route);
+ },[viewer?.id,viewer?.verified,viewer?.role,causes]);
+ const openCause=(c:Cause)=>{
+  setSelectedCause(c);
+  window.history.pushState(null,'',causeShareUrl(c.id,window.location.href));
+ };
+ const closeCause=()=>{
+  setSelectedCause(null);
+  const url=new URL(window.location.href);
+  if(url.searchParams.has('causa')){url.searchParams.delete('causa');window.history.replaceState(null,'',url)}
+ };
+ const shareCause=async(c:Cause)=>{
+  const url=causeShareUrl(c.id,window.location.href);
+  if(navigator.share){
+   try{await navigator.share({title:c.title,url});return}
+   catch(err){if((err as Error).name==='AbortError')return}
+  }
+  try{await navigator.clipboard.writeText(url);notify(t('Enlace privado copiado. Solo podrán abrirlo los miembros aprobados.','Private link copied. Only approved members can open it.'))}
+  catch{window.prompt(t('Copia este enlace privado','Copy this private link'),url)}
+ };
  const openApplication=()=>{setAuth(null);setApplication(true)};
  const openApprovedRegistration=()=>{setApplication(false);setAuth('signup')};
  const show=(next:Screen)=>{if(next==='setup'&&needsEnrollment){setupDismissed.current=false;setScreen('setup');return}
@@ -343,8 +378,19 @@ export default function App(){
     <div className="section-title"><div><span className="kicker">{t("APOYA AL GRUPO 4 DE CHIHUAHUA NORTE","SUPPORT GROUP 4 · NORTH CHIHUAHUA")}</span><h2>{t("Causas de la comunidad","Community causes")} <span>♥</span></h2>
      <p>{t("Elige una causa y solicita una intención de apoyo. Cada una tiene un folio único, cupo limitado y aprobación administrativa.","Choose a cause and submit a support intention. Each has a unique reference, limited capacity, and administrator approval.")}</p></div>
      <div className="headline-stat"><b>{results.length}</b><span>{t("causas visibles","visible causes")}</span></div></div>
-    <div className="filter-wrap"><div className="filter-controls"><label className="search-field"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder={t('Buscar causas','Search causes')} aria-label={t('Buscar causas','Search causes')}/></label></div></div>
-    {loading?<div className="empty"><Compass size={40}/> {t("Cargando…","Loading…")}</div>:<CauseGallery causes={results} onOpen={setSelectedCause}/>}
+    <div className="filter-wrap"><div className="filter-controls chn-cause-filters">
+     <label className="search-field"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder={t('Buscar causas','Search causes')} aria-label={t('Buscar causas','Search causes')}/></label>
+     <label className="chn-filter-select"><span>{t('Categoría','Category')}</span><select aria-label={t('Filtrar por categoría','Filter by category')} value={category} onChange={e=>setCategory(e.target.value as Category|'all')}>
+      <option value="all">{t('Todas','All categories')}</option>{categories.map(c=><option key={c} value={c}>{categoryLabel(c,language)}</option>)}
+     </select></label>
+     <label className="chn-filter-select"><span>{t('Disponibilidad','Availability')}</span><select aria-label={t('Filtrar por disponibilidad','Filter by availability')} value={statusFilter} onChange={e=>setStatusFilter(e.target.value as CauseFilter)}>
+      <option value="all">{t('Todas las causas','All causes')}</option><option value="available">{t('Con lugares','Available')}</option><option value="full">{t('Cupo completo','Full')}</option><option value="ended">{t('Finalizadas','Ended')}</option>
+     </select></label>
+     <label className="chn-filter-select"><span>{t('Ordenar','Sort')}</span><select aria-label={t('Ordenar causas','Sort causes')} value={sort} onChange={e=>setSort(e.target.value as CauseSort)}>
+      <option value="newest">{t('Más recientes','Newest')}</option><option value="ending">{t('Próximas a cerrar','Ending soon')}</option><option value="most-progress">{t('Mayor progreso','Most progress')}</option><option value="spaces">{t('Más espacios','Most spaces')}</option>
+     </select></label>
+    </div></div>
+    {loading?<div className="empty"><Compass size={40}/> {t("Cargando…","Loading…")}</div>:<CauseGallery causes={results} onOpen={openCause}/>}
     {canPublish(viewer)&&<div className="chn-create-bottom"><button className="primary" onClick={create}><Plus size={18}/> {t("Crear nueva causa","Create new cause")}</button></div>}
    </section>:<section className="explore-section private-welcome"><div className="private-welcome-inner"><Compass size={35}/>
      <h2>{t("Comunidad privada del Grupo 4","Private Group 4 community")}</h2><p>{needsEnrollment?'Tu cuenta necesita activar el acceso aprobado.':viewer?'Tu solicitud está en revisión.':'Solicita acceso para conocer nuestros proyectos y causas.'}</p>
@@ -357,20 +403,27 @@ export default function App(){
   </>:screen==='setup'?<section className="inner-page chn-setup-page"><div className="chn-setup-card"><div className="chn-setup-badge"><Fleur size={27}/></div>
    <ExistingMemberJoin done={refreshUser} cancel={logout} onSkip={()=>{setupDismissed.current=true;setScreen('explore')}} onApply={openApplication} notify={notify}/></div></section>:
   screen==='mine'?<section className="inner-page"><div className="section-title"><div><span className="kicker">{t("MIS PROYECTOS","MY PROJECTS")}</span><h2>{t("Mis causas","My causes")}</h2><p>{t("Consulta tus causas, incluidas las que están pendientes de aprobación.","View your causes, including those awaiting approval.")}</p></div>
-    <button className="primary" onClick={create}><Plus size={17}/> {t("Nueva causa","New cause")}</button></div><CauseGallery causes={mine} includeDrafts onOpen={setSelectedCause}/></section>:
+    <button className="primary" onClick={create}><Plus size={17}/> {t("Nueva causa","New cause")}</button></div><CauseGallery causes={mine} includeDrafts onOpen={openCause}/></section>:
   screen==='activity'?<section className="inner-page"><div className="section-title"><div><span className="kicker">{t("TU COMUNIDAD","YOUR COMMUNITY")}</span><h2>{t("Historial de apoyos","Support history")}</h2><p>{t("Consulta los folios únicos y su estado de aprobación. Ninguno acredita pagos.","View your unique reference numbers and approval statuses. None is proof of payment.")}</p></div><Heart size={40} className="page-icon"/></div>
    <div className="activity-block"><h3><Heart size={20}/> {t("Mis intenciones","My intentions")} <span>{mySupport.length}</span></h3>
-    {mySupport.length?mySupport.map(p=><div className="activity-row" key={p.id}>
+    <div className="chn-history-filters">
+     <label className="search-field"><Search size={17}/><input value={historyQuery} onChange={e=>setHistoryQuery(e.target.value)}
+      placeholder={t('Buscar folio, causa o destinatario','Find reference, cause, or recipient')} aria-label={t('Buscar historial','Search history')}/></label>
+     <select aria-label={t('Estado de intención','Intention status')} value={historyStatus} onChange={e=>setHistoryStatus(e.target.value as 'all'|'pending'|'approved'|'rejected')}>
+      <option value="all">{t('Todos los estados','All statuses')}</option><option value="pending">{t('Pendientes','Pending')}</option><option value="approved">{t('Aprobadas','Approved')}</option><option value="rejected">{t('Rechazadas','Rejected')}</option>
+     </select>
+    </div>
+    {filteredSupport.length?filteredSupport.map(p=><div className="activity-row" key={p.id}>
      <b>{causes.find(c=>c.id===p.cause_id)?.title||'Apoyo al Grupo 4'} · {format(p.amount,p.currency_code||'MXN')}</b>
      <small>Folio {ackLabel(p.acknowledgment_no)} · {p.status==='approved'?t('Aprobada','Approved'):p.status==='rejected'?t('Rechazada','Rejected'):p.status==='pending'?t('Pendiente de aprobación','Pending approval'):t(t('Registro anterior','Previous record'),'Previous record')} · Sin pago</small>
      <small>Destinatario: {p.recipient_name||t(t('No especificado','Not specified'),'Not specified')} · {new Date(p.created_at).toLocaleDateString('es-MX')}</small>
      <button className="chn-cause-history-action" onClick={()=>setAck({intent_id:p.id,ack_no:p.acknowledgment_no,cause_title:causes.find(c=>c.id===p.cause_id)?.title||'Apoyo al Grupo 4',issued_at:p.created_at,intent_status:p.status,recipient_name:p.recipient_name,amount_value:p.amount,currency_code:p.currency_code||'MXN'})}>{t("Ver acuse numerado","View numbered acknowledgment")}</button>
-    </div>):<p className="empty-small">{t("No has registrado ninguna intención de apoyo.","You haven't registered any support intentions.")}</p>}
+    </div>):<p className="empty-small">{mySupport.length?t('No hay resultados para esos filtros.','No matches for these filters.'):t("No has registrado ninguna intención de apoyo.","You haven't registered any support intentions.")}</p>}
     <button className="secondary" onClick={explore}>{t("Explorar causas","Explore causes")}</button>
    </div></section>:
   screen==='profile'&&(profileTarget||viewer)?<div className="inner-page profile-container"><button className="back-link" onClick={()=>show('explore')}><ArrowLeft size={17}/> Volver</button>
    <ProfilePage person={(profileTarget||viewer)!} current={viewer?.id===(profileTarget||viewer)?.id} onSave={refreshUser} notify={notify}
-    causes={causes.filter(c=>c.owner_id===(profileTarget||viewer)?.id&&(c.status==='active'||c.status==='finished'||viewer?.id===c.owner_id))} onOpen={setSelectedCause}/>
+    causes={causes.filter(c=>c.owner_id===(profileTarget||viewer)?.id&&(c.status==='active'||c.status==='finished'||viewer?.id===c.owner_id))} onOpen={openCause}/>
    {viewer?.id===(profileTarget||viewer)?.id&&<button className="text-logout" onClick={()=>{void logout()}}><LogOut size={16}/> {t("Cerrar sesión","Sign out")}</button>}</div>:
   screen==='admin'&&viewer?.role==='admin'?<div className="inner-page"><Admin causes={causes} refresh={refresh} notify={notify}/></div>:null
   }</main>
@@ -383,7 +436,7 @@ export default function App(){
   {passwordRecovery&&<Modal onClose={()=>setPasswordRecovery(false)}><PasswordRecovery onClose={()=>setPasswordRecovery(false)} notify={notify}/></Modal>}
   {auth&&<Modal onClose={()=>setAuth(null)}><Authentication mode={auth} setMode={setAuth} onClose={()=>setAuth(null)} onSuccess={async()=>{setupDismissed.current=false;await refreshUser()}} notify={notify} onApply={openApplication}/></Modal>}
   {ack&&<Modal width="620px" onClose={()=>setAck(null)}><AckPanel data={ack} onClose={()=>setAck(null)}/></Modal>}
-  {selectedCause&&access&&<Modal width="920px" onClose={()=>setSelectedCause(null)}><CauseDetail cause={selectedCause} onClose={()=>setSelectedCause(null)} onUpdated={refresh} notify={notify} onAcknowledged={result=>{setAck(result);if(viewer)void backend.supportIntents(viewer.id).then(setMySupport).catch(()=>{})}}/></Modal>}
+  {selectedCause&&access&&<Modal width="920px" onClose={closeCause}><CauseDetail cause={selectedCause} onClose={closeCause} onShare={()=>{void shareCause(selectedCause)}} onUpdated={refresh} notify={notify} onAcknowledged={result=>{setAck(result);if(viewer)void backend.supportIntents(viewer.id).then(setMySupport).catch(()=>{})}}/></Modal>}
   {creatingCause&&viewer&&<Modal width="850px" onClose={()=>setCreatingCause(false)}><CauseEditor user={viewer} onClose={()=>setCreatingCause(false)} onSaved={refresh} notify={notify}/></Modal>}
  </>;
 }
