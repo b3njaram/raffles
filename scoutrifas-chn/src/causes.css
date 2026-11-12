@@ -117,3 +117,6 @@ html[data-theme=dark] .chn-draft-tip button{background:#3c563f;color:#f1fff4;bor
 @media(max-width:1050px){.filter-controls.chn-cause-filters{grid-template-columns:repeat(3,minmax(0,1fr))}.chn-cause-filters .search-field{grid-column:1/-1}}
 @media(max-width:700px){.filter-controls.chn-cause-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.chn-cause-filters .search-field{grid-column:1/-1}.chn-draft-tip{flex-wrap:wrap}.chn-history-filters{grid-template-columns:1fr}}
 @media(max-width:390px){.filter-controls.chn-cause-filters{grid-template-columns:1fr}.chn-cause-heading{flex-direction:column}.chn-share-cause{align-self:flex-start}}
+
+.chn-admin-status-filter{min-height:39px;padding:7px 10px;border:1px solid var(--border);border-radius:9px;background:#faf8fb;color:#554460;font-size:.8rem}
+html[data-theme=dark] .chn-admin-status-filter{background:#30243d;color:#f2e7fb;border-color:#665076}
