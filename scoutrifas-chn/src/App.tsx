@@ -3,7 +3,7 @@ import type {FormEvent,ReactNode} from 'react';
 import {ArrowLeft,ArrowRight,BarChart3,Check,CheckCircle2,ChevronDown,Clock3,Compass,Flag,Heart,LogIn,LogOut,Menu,Plus,Search,ShieldCheck,Upload,Users,X} from 'lucide-react';
 import {backend,cloud,friendlyError,imageUrl,supabase} from './backend';
 import type {AccessRequest,Cause,MemberType,Profile,SupportIntent} from './types';
-import {ackLabel,canPublish,canViewCatalogue,formatId,isScoutId,money} from './types';
+import {ackLabel,canPublish,canViewCatalogue,formatId,isScoutId} from './types';
 import {AckPanel,CauseAdmin,CauseDetail,CauseEditor,CauseGallery} from './Causes';
 import type {AckDisplay} from './Causes';
 import {PreferenceSwitches,usePreferences} from './Preferences';
@@ -18,6 +18,7 @@ function Avatar({user,size=38}:{user?:Profile|null;size?:number}){
  return <span className="avatar" style={{width:size,height:size,fontSize:size*.32}}>{src?<img src={src} alt="Foto de perfil"/>:letters}</span>;
 }
 function Modal({children,onClose,width='560px'}:{children:ReactNode;onClose:()=>void;width?:string}){
+ const {t}=usePreferences();
  useEffect(()=>{const h=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose()};window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h)},[onClose]);
  return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}} role="presentation">
   <div className="modal" style={{maxWidth:width}} role="dialog" aria-modal="true">
@@ -178,7 +179,7 @@ function ProfilePage({person,current,onSave,notify,causes,onOpen}:{person:Profil
 }
 
 function Admin({causes,refresh,notify}:{causes:Cause[];refresh:()=>Promise<void>;notify:(s:string,e?:boolean)=>void}){
- const {t,format,date}=usePreferences();
+ const {t,format}=usePreferences();
  const [members,setMembers]=useState<Profile[]>([]),[requests,setRequests]=useState<AccessRequest[]>([]),[intents,setIntents]=useState<SupportIntent[]>([]);
  const [tab,setTab]=useState<'review'|'access'|'causes'|'intents'|'users'>('review'),[query,setQuery]=useState(''),[busy,setBusy]=useState(false);
  const reload=useCallback(async()=>{try{const [m,r,p]=await Promise.all([backend.members(),backend.accessRequests(),backend.supportIntents()]);
@@ -254,7 +255,7 @@ function Admin({causes,refresh,notify}:{causes:Cause[];refresh:()=>Promise<void>
 }
 
 export default function App(){
- const {t,format,date}=usePreferences();
+ const {t,format}=usePreferences();
  const setupDismissed=useRef(false);
  const [viewer,setViewer]=useState<Profile|null>(null),[needsEnrollment,setNeedsEnrollment]=useState(false),[causes,setCauses]=useState<Cause[]>([]),[loading,setLoading]=useState(true);
  const [screen,setScreen]=useState<Screen>('explore'),[profileTarget,setProfileTarget]=useState<Profile|null>(null),[selectedCause,setSelectedCause]=useState<Cause|null>(null);

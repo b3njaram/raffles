@@ -113,7 +113,7 @@ export function CauseDetail({cause,onClose,onUpdated,onAcknowledged,notify}:{cau
 }
 
 export function CauseEditor({user,onClose,onSaved,notify}:{user:Profile;onClose:()=>void;onSaved:()=>Promise<void>;notify:Notify}){
- const {t,format}=usePreferences();
+ const {t}=usePreferences();
  const [draft,setDraft]=useState<CauseDraft>({title:'',description:'',category:'Aventura',endAt:'',amount:100,amountUsd:10,target:3000,targetUsd:300,maxIntentions:100});
  const [photos,setPhotos]=useState<File[]>([]),[busy,setBusy]=useState(false);
  const preview=useMemo(()=>photos.map(file=>({name:file.name,url:URL.createObjectURL(file)})),[photos]);
