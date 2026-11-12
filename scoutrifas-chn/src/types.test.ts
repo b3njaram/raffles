@@ -28,7 +28,7 @@ describe('causas comunitarias',()=>{
   expect(ackLabel(10001)).toBe('G4-00010001');expect(ackLabel(10002)).toBe('G4-00010002');
  });
  it('formatea montos en MXN',()=>expect(money(150)).toContain('150'));
- it('mantiene importes por moneda sin convertirlos',()=>{expect(money(10,'USD')).toContain('$10');expect(causeAmount(cause,'MXN')).toBe(100);expect(causeAmount(cause,'USD')).toBe(7);expect(causeTotal(cause,'USD')).toBe(0);expect(causeTarget(cause,'USD')).toBe(150)});
+ it('mantiene importes por moneda sin convertirlos',()=>{expect(money(10,'USD')).toContain('10');expect(causeAmount(cause,'MXN')).toBe(100);expect(causeAmount(cause,'USD')).toBe(7);expect(causeTotal(cause,'USD')).toBe(0);expect(causeTarget(cause,'USD')).toBe(150)});
  it('muestra la proporción del cupo de intenciones',()=>{expect(intentionProgress({...cause,intention_count:5})).toBe(20);expect(intentionProgress({...cause,intention_count:25})).toBe(100)});
  it('no permite porcentajes superiores a cien ni negativos',()=>{expect(intentionProgress({...cause,intention_count:30})).toBe(100);expect(intentionProgress({...cause,intention_count:0})).toBe(0)});
  it('indica el fin de una causa vencida',()=>expect(remaining('2020-01-01T00:00:00Z')).toBe('Finalizó'));

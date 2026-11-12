@@ -80,3 +80,14 @@
 .chn-ack-print .chn-ack-details{font-size:.83rem}
 .admin-view .admin-actions{display:flex;gap:7px;flex-wrap:wrap}
 .admin-view .admin-actions button{white-space:nowrap}
+
+/* Per-intention currency choice, shown in both theme variants */
+.chn-currency-choices{border:1px solid #dcd2e6;border-radius:13px;padding:12px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0 0}
+.chn-currency-choices legend{font-size:.8rem;font-weight:800;color:#675476;padding:0 6px}
+.chn-currency-choices button{padding:12px 10px;font-size:.81rem;font-weight:800;text-align:center;white-space:normal;border:1px solid #e3dbe8;border-radius:10px;background:#f8f4fb;color:#5a4471;cursor:pointer}
+.chn-currency-choices button.active{background:#673f88;color:#fff;border-color:#673f88;box-shadow:0 3px 14px #5a2f7b24}
+.chn-currency-choices button:disabled{opacity:.55}
+html[data-theme=dark] .chn-currency-choices{border-color:#655176}
+html[data-theme=dark] .chn-currency-choices legend{color:#e1cce7}
+html[data-theme=dark] .chn-currency-choices button{background:#3b2a4a;border-color:#6b557d;color:#eee1f3}
+html[data-theme=dark] .chn-currency-choices button.active{background:#855daf;border-color:#a17dc3;color:#fff}
