@@ -3,6 +3,18 @@
 Plataforma privada para **causas auténticas de apoyo comunitario**. Los participantes solamente pueden crear y consultar intenciones de apoyo a proyectos del Grupo 4, sujetas a aprobación previa del único administrador.
 
 
+## Español, English y apariencia
+
+- Español (ES) es el idioma predeterminado. El interruptor **ES / EN** en el encabezado cambia los textos del interfaz; las descripciones escritas por los usuarios conservan su idioma original.
+- Otro interruptor en el encabezado cambia entre **tema claro y tema oscuro**. Ambas preferencias se guardan localmente en el navegador del usuario.
+- Las causas nuevas permiten configurar **un importe y una meta en MXN** y **otro importe y otra meta en USD**; no usamos tipo de cambio automático.
+- Cada intención elige MXN o USD y guarda esa denominación, el importe, un acuse numérico único y un estado de aprobación. Los totales se mantienen **separados por moneda**; rechazar una intención resta solo de la moneda que correspondía.
+- Las causas anteriores permanecen en MXN hasta que se creen nuevas causas con montos USD configurados.
+- Esta aplicación no cobra dinero, no conecta cuentas bancarias ni genera CFDI. Aunque en el futuro existan una cuenta USD y otra MXN, **deberán verificarse y conectarse expresamente** por el propietario o entidad autorizada. No se ha configurado ninguna cuenta personal ni de la organización.
+- El alojamiento en Vercel no determina por sí mismo el país del beneficiario ni el tratamiento fiscal de los fondos.
+
+Migraciones: `supabase/migrations/20261111180000_dual_currency_intentions.sql` y `20261111183000_dual_currency_amount_check.sql`.
+
 ## Cupos y aprobación individual de intenciones
 
 Cada causa tiene un **máximo de intenciones**, fijado por el organizador al crearla (1 a 100,000). Una barra de progreso muestra \`registradas / límite\`, tanto en las tarjetas como en los detalles y la administración. Los registros pendientes y los aprobados utilizan cupo; si se rechaza una intención, se libera un espacio y disminuye el total de importes previstos.

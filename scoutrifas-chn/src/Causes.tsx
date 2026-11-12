@@ -25,7 +25,7 @@ export function CauseGallery({causes,onOpen,includeDrafts=false}:{causes:Cause[]
     <div className="chn-intentions-progress" role="progressbar" aria-label={'Intenciones de '+c.title} aria-valuenow={c.intention_count} aria-valuemin={0} aria-valuemax={c.max_intentions}>
      <span style={{width:intentionProgress(c)+'%'}}/>
     </div><small className="chn-intentions-caption">{c.intention_count>=c.max_intentions?t('Cupo completo','Capacity reached'):c.max_intentions-c.intention_count+' espacios disponibles'}</small>
-    <span className="chn-cause-action">Conocer la causa <ArrowRight size={17}/></span>
+    <span className="chn-cause-action">{t("Conocer la causa","Explore cause")} <ArrowRight size={17}/></span>
    </div>
   </button>)}
   {approved.length===0&&<div className="chn-cause-empty"><Heart size={35}/><h3>{t("Próximamente: causas del Grupo 4","Group 4 causes coming soon")}</h3><p>{t("Las nuevas iniciativas aparecerán aquí cuando sean revisadas por administración.","New initiatives will appear here after administrative review.")}</p></div>}
@@ -48,7 +48,7 @@ export function AckPanel({data,onClose}:{data:AckDisplay;onClose:()=>void}){
    </div>
    <div className="chn-ack-footer">{t("El folio es único. No proporciona contraprestaciones. Si se efectúa una donación real, su comprobante correspondiente debe ser emitido por la entidad receptora conforme a la normativa aplicable.","This acknowledgment number is unique and grants no benefits in return. Any receipt for a genuine donation must be issued by the recipient entity under applicable rules.")}</div>
   </div>
-  <div className="chn-ack-actions"><button type="button" className="primary" onClick={()=>window.print()}><Printer size={18}/> Imprimir / guardar PDF</button><button className="secondary" type="button" onClick={onClose}>{t("Cerrar","Close")}</button></div>
+  <div className="chn-ack-actions"><button type="button" className="primary" onClick={()=>window.print()}><Printer size={18}/> {t("Imprimir / guardar PDF","Print / save PDF")}</button><button className="secondary" type="button" onClick={onClose}>{t("Cerrar","Close")}</button></div>
  </div>;
 }
 
@@ -107,7 +107,7 @@ export function CauseDetail({cause,onClose,onUpdated,onAcknowledged,notify}:{cau
     <label>{t("Mensaje para la causa (opcional)","Message for this cause (optional)")}<textarea maxLength={240} rows={2} value={note} onChange={e=>setNote(e.target.value)} placeholder={t("Un mensaje de apoyo para Grupo 4…","A message of support for Group 4…")}/></label>
     <button className="primary full" type="submit" disabled={busy||!open||!recipients.some(r=>r.id===recipientId)}>{busy?t('Registrando…','Registering…'):cause.intention_count>=cause.max_intentions?t('Cupo completo','Capacity reached'):open?t('Solicitar intención por ','Submit intention for ')+format(causeAmount(cause,currency)||0,currency):t('No disponible','Unavailable')} <ArrowRight size={17}/></button>
    </form>
-   <p className="chn-cause-disclaimer"><ShieldCheck size={17}/> El folio entregado es un acuse de intención, no comprobante de donativo pagado. No proporciona premios ni contraprestaciones.</p>
+   <p className="chn-cause-disclaimer"><ShieldCheck size={17}/> {t("El folio entregado es un acuse de intención, no comprobante de donativo pagado. No proporciona premios ni contraprestaciones.","This reference number acknowledges an intention, not a paid donation. It provides no prizes or compensation.")}</p>
   </div>
  </div>;
 }
@@ -160,7 +160,7 @@ export function CauseEditor({user,onClose,onSaved,notify}:{user:Profile;onClose:
    <div className="chn-cause-projector"><small>{t("Intenciones necesarias para igualar la meta","Intentions needed to meet the goal")}</small><strong>{draft.amount>0?Math.ceil(draft.target/draft.amount).toLocaleString('es-MX'):'—'}</strong><span>{t("Esto es planificación; no representa dinero recibido.","Planning only; this does not represent money received.")}</span></div>
    <label>Fotos de la causa ({photos.length}/10)<div className="upload-zone"><ImagePlus size={25}/><b>{t("Elegir fotos","Choose photos")}</b><small>{t("1 a 10 imágenes · 5 MB máximo cada una","1 to 10 photos · up to 5 MB each")}</small><input disabled={busy||photos.length>=10} type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={e=>{addPhotos(Array.from(e.target.files||[]));e.target.value=''}}/></div></label>
    {!!preview.length&&<div className="chn-upload-previews">{preview.map((pic,i)=><div className="chn-preview" key={pic.url}><img src={pic.url} alt={'Foto '+(i+1)}/><button type="button" aria-label={'Quitar '+pic.name} onClick={()=>setPhotos(current=>current.filter((_,index)=>index!==i))}><X size={16}/></button></div>)}</div>}
-   <div className="notice"><ShieldCheck size={18}/> Los registros generan acuses de intención. No se cobra dinero ni se emiten facturas fiscales.</div>
+   <div className="notice"><ShieldCheck size={18}/> {t("Los registros generan acuses de intención. No se cobra dinero ni se emiten facturas fiscales.","Registrations generate intention acknowledgments. No payments are collected or tax invoices issued.")}</div>
    <button className="primary full" type="submit" disabled={busy}>{busy?t('Publicando…','Publishing…'):t('Enviar causa para aprobación','Submit cause for approval')} <ArrowRight size={17}/></button>
   </form>
  </div>;
