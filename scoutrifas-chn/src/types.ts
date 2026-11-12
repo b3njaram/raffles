@@ -54,3 +54,45 @@ export const remaining=(iso:string,language:'es'|'en'='es')=>{
  const days=Math.floor(delta/86400000),hours=Math.floor(delta%86400000/3600000);
  return days?days+(language==='en'?'d ':' d ')+hours+'h':hours?hours+'h '+Math.floor(delta%3600000/60000)+'m':Math.max(1,Math.ceil(delta/60000))+(language==='en'?'m':' min');
 };
+
+/** Catalogue filtering is local to the already-authorized cause list; it grants no database access. */
+export type CauseSort='newest'|'ending'|'most-progress'|'spaces';
+export type CauseFilter='all'|'available'|'full'|'ended';
+export interface CauseSearch {
+ query:string;category:Category|'all';status:CauseFilter;sort:CauseSort;
+}
+export const isCauseAvailable=(c:Cause,now=Date.now()):boolean=>
+ c.status==='active'&&new Date(c.end_at).getTime()>now&&c.intention_count<c.max_intentions;
+export function filterCauses(causes:Cause[],options:CauseSearch,now=Date.now()):Cause[]{
+ const q=options.query.trim().toLocaleLowerCase();
+ const searchable=(c:Cause)=>[c.title,c.description,c.category,c.owner?.display_name||''].join(' ').toLocaleLowerCase().includes(q);
+ const filtered=causes.filter(c=>{
+  if(c.status!=='active'&&c.status!=='finished')return false;
+  if(options.category!=='all'&&c.category!==options.category)return false;
+  if(!searchable(c))return false;
+  const available=isCauseAvailable(c,now),expired=new Date(c.end_at).getTime()<=now||c.status==='finished';
+  return options.status==='all'||(options.status==='available'&&available)||
+   (options.status==='full'&&c.status==='active'&&!expired&&c.intention_count>=c.max_intentions)||
+   (options.status==='ended'&&expired);
+ });
+ return filtered.sort((a,b)=>{
+  if(options.sort==='ending'){
+   const ad=new Date(a.end_at).getTime(),bd=new Date(b.end_at).getTime();
+   const af=ad>now&&a.status==='active',bf=bd>now&&b.status==='active';
+   return Number(bf)-Number(af)||(af?ad-bd:bd-ad);
+  }
+  if(options.sort==='most-progress')return intentionProgress(b)-intentionProgress(a)||
+   new Date(b.created_at).getTime()-new Date(a.created_at).getTime();
+  if(options.sort==='spaces')return (b.max_intentions-b.intention_count)-(a.max_intentions-a.intention_count);
+  return new Date(b.created_at).getTime()-new Date(a.created_at).getTime();
+ });
+}
+/** Only an identifier is placed in the shared URL; authorized users still pass RLS. */
+export const validCauseId=(id:string|null|undefined):id is string=>
+ Boolean(id&&/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(id));
+export function causeShareUrl(id:string,currentUrl:string):string{
+ if(!validCauseId(id))throw new Error('ID de causa inválido');
+ const url=new URL(currentUrl);url.searchParams.set('causa',id);url.hash='';
+ return url.toString();
+}
+export const causeDraftKey=(userId:string)=>'scoutapoya:cause-draft:v1:'+userId;
