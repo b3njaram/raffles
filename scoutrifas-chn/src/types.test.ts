@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {ackLabel,canPublish,canViewCatalogue,causeIsActive,formatId,isScoutId,money,remaining,intentionProgress,causeAmount,causeTotal,causeTarget} from './types';
+import {ackLabel,canPublish,canViewCatalogue,causeIsActive,formatId,isScoutId,money,remaining,intentionProgress,causeAmount,causeTotal,causeTarget,filterCauses,isCauseAvailable,validCauseId,causeShareUrl,causeDraftKey} from './types';
 import type {Cause,Profile} from './types';
 const scout:Profile={id:'scout1',scout_id:'CHN-000123',member_type:'scout',adult_attested:true,
  display_name:'Test Scout',group_name:'Grupo 4',bio:'',avatar_path:null,role:'member',verified:true,created_at:''};
@@ -32,4 +32,45 @@ describe('causas comunitarias',()=>{
  it('muestra la proporción del cupo de intenciones',()=>{expect(intentionProgress({...cause,intention_count:5})).toBe(20);expect(intentionProgress({...cause,intention_count:25})).toBe(100)});
  it('no permite porcentajes superiores a cien ni negativos',()=>{expect(intentionProgress({...cause,intention_count:30})).toBe(100);expect(intentionProgress({...cause,intention_count:0})).toBe(0)});
  it('indica el fin de una causa vencida',()=>expect(remaining('2020-01-01T00:00:00Z')).toBe('Finalizó'));
+});
+
+
+describe('discovery of authorized causes',()=>{
+ const earlier={...cause,id:'1033cf9c-50cf-45d1-8a63-a96b84ac9c24',title:'Transporte',created_at:'2026-10-10T00:00:00Z',
+  end_at:'2026-12-01T00:00:00Z',intention_count:24};
+ const later={...cause,id:'44aabbc1-dd11-42cb-8e3f-ec64484a83a6',title:'Equipo para acampar',category:'Equipo' as const,
+  created_at:'2026-11-10T00:00:00Z',end_at:'2026-11-20T00:00:00Z',intention_count:25};
+ const current=Date.parse('2026-11-11T00:00:00Z');
+ it('sorts newest first and filters categories without exposing pending causes',()=>{
+  const data=[earlier,later,{...cause,status:'pending' as const}];
+  expect(filterCauses(data,{query:'',category:'all',status:'all',sort:'newest'},current).map(c=>c.id)).toEqual([later.id,earlier.id]);
+  expect(filterCauses(data,{query:'',category:'Equipo',status:'all',sort:'newest'},current).map(c=>c.title)).toEqual([later.title]);
+ });
+ it('distinguishes open and full causes and orders soonest closing',()=>{
+  expect(isCauseAvailable(earlier,current)).toBe(true);
+  expect(isCauseAvailable(later,current)).toBe(false);
+  expect(filterCauses([earlier,later],{query:'',category:'all',status:'available',sort:'ending'},current)).toHaveLength(1);
+  expect(filterCauses([earlier,later],{query:'',category:'all',status:'full',sort:'ending'},current)[0].id).toBe(later.id);
+ });
+ it('searches owner and description, and sorts by available spaces',()=>{
+  const settings={query:'equipo',category:'all' as const,status:'all' as const,sort:'spaces' as const};
+  expect(filterCauses([earlier,later],settings,current).map(c=>c.title)).toEqual([later.title]);
+  expect(filterCauses([earlier,later],{...settings,query:''},current)[0].id).toBe(earlier.id);
+ });
+});
+describe('private cause deep links and local drafts',()=>{
+ const id='1033cf9c-50cf-45d1-8a63-a96b84ac9c24';
+ it('accepts valid cause ids and rejects malformed links',()=>{
+  expect(validCauseId(id)).toBe(true);
+  expect(validCauseId('../../bad')).toBe(false);
+  expect(validCauseId(null)).toBe(false);
+ });
+ it('preserves the existing origin and query parameters without sensitive content',()=>{
+  const result=causeShareUrl(id,'https://scoutapoya-chn.vercel.app/?lang=es#causas');
+  expect(result).toBe('https://scoutapoya-chn.vercel.app/?lang=es&causa='+id);
+  expect(()=>causeShareUrl('../../bad','https://scoutapoya-chn.vercel.app/')).toThrow();
+ });
+ it('isolates a cause draft by organizer account',()=>{
+  expect(causeDraftKey('owner-a')).not.toBe(causeDraftKey('owner-b'));
+ });
 });
