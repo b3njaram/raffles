@@ -16,19 +16,19 @@ export function CauseGallery({causes,onOpen,includeDrafts=false}:{causes:Cause[]
  return <div className="chn-causes-grid">
   {approved.map(c=><button key={c.id} type="button" className="chn-cause-card" onClick={()=>onOpen(c)}>
    <div className="chn-cause-cover">{c.image_paths[0]&&imageUrl(c.image_paths[0])?<img loading="lazy" src={imageUrl(c.image_paths[0])} alt={c.title}/>:<span className="chn-cause-cover-fallback"><Heart size={42}/></span>}
-    <span className="chn-cause-tag"><Heart size={14}/> {c.status==='pending'?'En revisión':c.status==='paused'?'Pausada':c.status==='cancelled'?'Cancelada':'Causa comunitaria'}</span>
+    <span className="chn-cause-tag"><Heart size={14}/> {c.status==='pending'?t('En revisión','In review'):c.status==='paused'?t('Pausada','Paused'):c.status==='cancelled'?t('Cancelada','Cancelled'):t('Causa comunitaria','Community cause')}</span>
    </div>
    <div className="chn-cause-copy"><span className="chn-cause-category">{c.category} · Grupo 4 CHN</span>
     <h3>{c.title}</h3><p>{c.description}</p>
-    <div className="chn-cause-amount"><span>Apoyo sugerido por registro</span><strong>{format(c.fixed_support_amount,'MXN')}{c.fixed_support_amount_usd!=null&&<> · {format(c.fixed_support_amount_usd,'USD')}</>}</strong></div>
+    <div className="chn-cause-amount"><span>{t("Apoyo sugerido por registro","Suggested support per entry")}</span><strong>{format(c.fixed_support_amount,'MXN')}{c.fixed_support_amount_usd!=null&&<> · {format(c.fixed_support_amount_usd,'USD')}</>}</strong></div>
     <div className="chn-cause-meta"><span><Users size={15}/> {c.intention_count} / {c.max_intentions} intenciones</span><span><Clock3 size={15}/> {remaining(c.end_at)}</span></div>
     <div className="chn-intentions-progress" role="progressbar" aria-label={'Intenciones de '+c.title} aria-valuenow={c.intention_count} aria-valuemin={0} aria-valuemax={c.max_intentions}>
      <span style={{width:intentionProgress(c)+'%'}}/>
-    </div><small className="chn-intentions-caption">{c.intention_count>=c.max_intentions?'Cupo completo':c.max_intentions-c.intention_count+' espacios disponibles'}</small>
+    </div><small className="chn-intentions-caption">{c.intention_count>=c.max_intentions?t('Cupo completo','Capacity reached'):c.max_intentions-c.intention_count+' espacios disponibles'}</small>
     <span className="chn-cause-action">Conocer la causa <ArrowRight size={17}/></span>
    </div>
   </button>)}
-  {approved.length===0&&<div className="chn-cause-empty"><Heart size={35}/><h3>Próximamente: causas del Grupo 4</h3><p>Las nuevas iniciativas aparecerán aquí cuando sean revisadas por administración.</p></div>}
+  {approved.length===0&&<div className="chn-cause-empty"><Heart size={35}/><h3>{t("Próximamente: causas del Grupo 4","Group 4 causes coming soon")}</h3><p>{t("Las nuevas iniciativas aparecerán aquí cuando sean revisadas por administración.","New initiatives will appear here after administrative review.")}</p></div>}
  </div>;
 }
 
@@ -36,19 +36,19 @@ export function AckPanel({data,onClose}:{data:AckDisplay;onClose:()=>void}){
  const {t,format,date}=usePreferences();
  return <div className="chn-ack-modal">
   <div className="chn-ack-print">
-   <div className="chn-ack-heading"><Heart size={35}/><div><strong>SCOUTAPOYA · GRUPO 4 CHN</strong><small>Acuse de intención de apoyo</small></div></div>
-   <p className="chn-ack-notice">Este documento confirma un registro en la plataforma. No representa una compra, un pago recibido, una donación deducible ni un CFDI.</p>
+   <div className="chn-ack-heading"><Heart size={35}/><div><strong>{t("SCOUTAPOYA · GRUPO 4 CHN","SCOUTAPOYA · GROUP 4 CHN")}</strong><small>{t("Acuse de intención de apoyo","Support intention acknowledgment")}</small></div></div>
+   <p className="chn-ack-notice">{t("Este documento confirma un registro en la plataforma. No representa una compra, un pago recibido, una donación deducible ni un CFDI.","This confirms a record in the platform. It is not a purchase, received payment, tax-deductible donation, or tax invoice.")}</p>
    <div className="chn-ack-no">{ackLabel(data.ack_no)}</div>
    <div className="chn-ack-details">
-    <div><span>Causa</span><strong>{data.cause_title}</strong></div>
-    <div><span>Monto previsto</span><strong>{format(data.amount_value,data.currency_code)}</strong></div>
-    <div><span>Cuenta destinataria seleccionada</span><strong>{data.recipient_name||'Grupo 4 · Chihuahua Norte'}</strong></div>
-    <div><span>Fecha de registro</span><strong>{date(data.issued_at)}</strong></div>
-    <div><span>Estado de revisión</span><strong>{data.intent_status==='approved'?'Aprobada por administración':data.intent_status==='rejected'?'Rechazada':data.intent_status==='pending'?'Pendiente de aprobación':'Intención registrada'} · Sin pago</strong></div>
+    <div><span>{t("Causa","Cause")}</span><strong>{data.cause_title}</strong></div>
+    <div><span>{t("Monto previsto","Planned amount")}</span><strong>{format(data.amount_value,data.currency_code)}</strong></div>
+    <div><span>{t("Cuenta destinataria seleccionada","Selected recipient account")}</span><strong>{data.recipient_name||'Grupo 4 · Chihuahua Norte'}</strong></div>
+    <div><span>{t("Fecha de registro","Date registered")}</span><strong>{date(data.issued_at)}</strong></div>
+    <div><span>{t("Estado de revisión","Review status")}</span><strong>{data.intent_status==='approved'?t('Aprobada por administración','Approved by admin'):data.intent_status==='rejected'?t('Rechazada','Rejected'):data.intent_status==='pending'?t('Pendiente de aprobación','Pending approval'):t('Intención registrada','Intention registered')} · Sin pago</strong></div>
    </div>
-   <div className="chn-ack-footer">El folio es único. No proporciona contraprestaciones. Si se efectúa una donación real, su comprobante correspondiente debe ser emitido por la entidad receptora conforme a la normativa aplicable.</div>
+   <div className="chn-ack-footer">{t("El folio es único. No proporciona contraprestaciones. Si se efectúa una donación real, su comprobante correspondiente debe ser emitido por la entidad receptora conforme a la normativa aplicable.","This acknowledgment number is unique and grants no benefits in return. Any receipt for a genuine donation must be issued by the recipient entity under applicable rules.")}</div>
   </div>
-  <div className="chn-ack-actions"><button type="button" className="primary" onClick={()=>window.print()}><Printer size={18}/> Imprimir / guardar PDF</button><button className="secondary" type="button" onClick={onClose}>Cerrar</button></div>
+  <div className="chn-ack-actions"><button type="button" className="primary" onClick={()=>window.print()}><Printer size={18}/> Imprimir / guardar PDF</button><button className="secondary" type="button" onClick={onClose}>{t("Cerrar","Close")}</button></div>
  </div>;
 }
 
@@ -77,14 +77,14 @@ export function CauseDetail({cause,onClose,onUpdated,onAcknowledged,notify}:{cau
    {cause.image_paths.length>1&&<div className="chn-cause-photos">{cause.image_paths.map((path,index)=><button key={path} className={index===photo?'active':''} aria-label={'Ver imagen '+(index+1)} type="button" onClick={()=>setPhoto(index)}><img src={imageUrl(path)} alt=""/></button>)}</div>}
   </div>
   <div className="chn-cause-detail-info">
-   <span className="kicker">CAUSA PARA EL GRUPO 4</span><h2>{cause.title}</h2>
+   <span className="kicker">{t("CAUSA PARA EL GRUPO 4","CAUSE FOR GROUP 4")}</span><h2>{cause.title}</h2>
    <p className="chn-cause-description">{cause.description}</p>
-   <div className="chn-cause-amount-box"><span>Monto fijado por el organizador para cada intención</span><strong>{format(cause.fixed_support_amount,'MXN')}{cause.fixed_support_amount_usd!=null&&<> / {format(cause.fixed_support_amount_usd,'USD')}</>}</strong><small>Puedes registrar varias intenciones mientras haya cupo disponible. No hay cobros en esta página.</small></div>
+   <div className="chn-cause-amount-box"><span>{t("Monto fijado por el organizador para cada intención","Amount set by the organizer for each intention")}</span><strong>{format(cause.fixed_support_amount,'MXN')}{cause.fixed_support_amount_usd!=null&&<> / {format(cause.fixed_support_amount_usd,'USD')}</>}</strong><small>{t("Puedes registrar varias intenciones mientras haya cupo disponible. No hay cobros en esta página.","You may register multiple intentions while capacity remains. No payments are collected here.")}</small></div>
    <div className="chn-cause-metrics"><span><Heart size={16}/> {cause.intention_count} / {cause.max_intentions} intenciones registradas</span><span><Clock3 size={16}/> {remaining(cause.end_at)}</span></div>
-   <div className="chn-intentions-progress chn-intentions-progress-large" role="progressbar" aria-label="Cupo de intenciones" aria-valuenow={cause.intention_count} aria-valuemin={0} aria-valuemax={cause.max_intentions}>
+   <div className="chn-intentions-progress chn-intentions-progress-large" role="progressbar" aria-label={t("Cupo de intenciones","Intention capacity")} aria-valuenow={cause.intention_count} aria-valuemin={0} aria-valuemax={cause.max_intentions}>
     <span style={{width:intentionProgress(cause)+'%'}}/>
    </div>
-   <p className="chn-intentions-detail">{cause.intention_count>=cause.max_intentions?'Límite de intenciones alcanzado.':(cause.max_intentions-cause.intention_count)+' espacios restantes. Incluye intenciones pendientes y aprobadas.'}</p>
+   <p className="chn-intentions-detail">{cause.intention_count>=cause.max_intentions?t('Límite de intenciones alcanzado.','Intention capacity reached.'):(cause.max_intentions-cause.intention_count)+t(' espacios restantes. Incluye intenciones pendientes y aprobadas.',' remaining spots. Includes pending and approved intentions.')}</p>
    {causeTarget(cause,currency)>0&&<div className="chn-cause-goal">
     <div><b>{t('Meta orientativa','Indicative goal')}: {format(causeTarget(cause,currency),currency)}</b>
      <span>{format(causeTotal(cause,currency),currency)} {t('en intenciones, NO cobrado','in intentions, NOT collected')}</span></div>
@@ -99,13 +99,13 @@ export function CauseDetail({cause,onClose,onUpdated,onAcknowledged,notify}:{cau
     <p className="chn-intentions-caption">{t('Se registra la moneda que elijas, sin conversión automática ni movimiento de dinero.','We record the chosen currency without automatic conversion or money movement.')}</p>
     <label>Cuenta a la que diriges esta intención
      <select required value={recipientId} onChange={e=>setRecipientId(e.target.value)}>
-      {recipients.length===0&&<option value="">Cargando miembros aprobados…</option>}
-      {recipients.map(r=><option key={r.id} value={r.id}>{r.id===cause.owner_id?'Organizador · ':r.role==='admin'?'Administración · ':'Otro miembro · '}{r.display_name}</option>)}
+      {recipients.length===0&&<option value="">{t("Cargando miembros aprobados…","Loading approved members…")}</option>}
+      {recipients.map(r=><option key={r.id} value={r.id}>{r.id===cause.owner_id?t('Organizador · ','Organizer · '):r.role==='admin'?t('Administración · ','Admin · '):t('Otro miembro · ','Other member · ')}{r.display_name}</option>)}
      </select>
     </label>
-    <p className="chn-intentions-caption">Solo se registra la persona destinataria. No se piden cuentas bancarias ni se realizan transferencias. La administración revisa cada solicitud.</p>
-    <label>Mensaje para la causa (opcional)<textarea maxLength={240} rows={2} value={note} onChange={e=>setNote(e.target.value)} placeholder="Un mensaje de apoyo para Grupo 4…"/></label>
-    <button className="primary full" type="submit" disabled={busy||!open||!recipients.some(r=>r.id===recipientId)}>{busy?'Registrando…':cause.intention_count>=cause.max_intentions?'Cupo completo':open?'Solicitar intención por '+format(causeAmount(cause,currency)||0,currency):'No disponible'} <ArrowRight size={17}/></button>
+    <p className="chn-intentions-caption">{t("Solo se registra la persona destinataria. No se piden cuentas bancarias ni se realizan transferencias. La administración revisa cada solicitud.","Only the intended recipient is recorded. We don't request bank details or process transfers. Each request is reviewed by an administrator.")}</p>
+    <label>{t("Mensaje para la causa (opcional)","Message for this cause (optional)")}<textarea maxLength={240} rows={2} value={note} onChange={e=>setNote(e.target.value)} placeholder={t("Un mensaje de apoyo para Grupo 4…","A message of support for Group 4…")}/></label>
+    <button className="primary full" type="submit" disabled={busy||!open||!recipients.some(r=>r.id===recipientId)}>{busy?t('Registrando…','Registering…'):cause.intention_count>=cause.max_intentions?t('Cupo completo','Capacity reached'):open?t('Solicitar intención por ','Submit intention for ')+format(causeAmount(cause,currency)||0,currency):t('No disponible','Unavailable')} <ArrowRight size={17}/></button>
    </form>
    <p className="chn-cause-disclaimer"><ShieldCheck size={17}/> El folio entregado es un acuse de intención, no comprobante de donativo pagado. No proporciona premios ni contraprestaciones.</p>
   </div>
@@ -139,29 +139,29 @@ export function CauseEditor({user,onClose,onSaved,notify}:{user:Profile;onClose:
   }catch(err){if(uploaded.length)await backend.removeUploaded(uploaded,'listings').catch(()=>{});notify(friendlyError(err),true)}
   finally{setBusy(false)}
  };
- return <div className="chn-cause-editor"><span className="kicker">PROYECTOS · GRUPO 4 CHN</span><h2>Crear una causa</h2>
-  <p>Comparte una necesidad concreta y define un monto fijo por intención de apoyo. Es una iniciativa comunitaria sin contraprestaciones.</p>
+ return <div className="chn-cause-editor"><span className="kicker">{t("PROYECTOS · GRUPO 4 CHN","PROJECTS · GROUP 4 CHN")}</span><h2>{t("Crear una causa","Create a cause")}</h2>
+  <p>{t("Comparte una necesidad concreta y define un monto fijo por intención de apoyo. Es una iniciativa comunitaria sin contraprestaciones.","Describe a real need and define fixed support intention amounts. This is a community initiative without benefits in return.")}</p>
   <form className="form-col" onSubmit={submit}>
-   <label>Nombre de la causa<input required minLength={5} maxLength={110} value={draft.title} onChange={e=>change('title',e.target.value)} placeholder="Ej. Transporte para campamento"/></label>
-   <label>¿Para qué se usarían los recursos?<textarea required minLength={20} maxLength={2500} rows={4} value={draft.description} onChange={e=>change('description',e.target.value)} placeholder="Describe el proyecto y cómo beneficiaría al Grupo 4."/></label>
-   <div className="two-fields"><label>Categoría<select value={draft.category} onChange={e=>change('category',e.target.value as Category)}>{categories.map(c=><option key={c}>{c}</option>)}</select></label>
-    <label>Cierre de la causa<input required type="datetime-local" value={draft.endAt} onChange={e=>change('endAt',e.target.value)}/></label></div>
-   <div className="two-fields"><label>Importe por intención (MXN)<input required type="number" min={20} max={100000} step={1} value={draft.amount} onChange={e=>change('amount',Number(e.target.value))}/></label>
-    <label>Meta prevista (MXN)<input required type="number" min={0} max={100000000} step={1} value={draft.target} onChange={e=>change('target',Number(e.target.value))}/></label></div>
+   <label>{t("Nombre de la causa","Cause title")}<input required minLength={5} maxLength={110} value={draft.title} onChange={e=>change('title',e.target.value)} placeholder={t("Ej. Transporte para campamento","E.g., camp transportation")}/></label>
+   <label>{t("¿Para qué se usarían los recursos?","How would the funds be used?")}<textarea required minLength={20} maxLength={2500} rows={4} value={draft.description} onChange={e=>change('description',e.target.value)} placeholder={t("Describe el proyecto y cómo beneficiaría al Grupo 4.","Describe your project and how it helps Group 4.")}/></label>
+   <div className="two-fields"><label>{t("Categoría","Category")}<select value={draft.category} onChange={e=>change('category',e.target.value as Category)}>{categories.map(c=><option key={c}>{c}</option>)}</select></label>
+    <label>{t("Cierre de la causa","Cause closing date")}<input required type="datetime-local" value={draft.endAt} onChange={e=>change('endAt',e.target.value)}/></label></div>
+   <div className="two-fields"><label>{t("Importe por intención (MXN)","Amount per intention (MXN)")}<input required type="number" min={20} max={100000} step={1} value={draft.amount} onChange={e=>change('amount',Number(e.target.value))}/></label>
+    <label>{t("Meta prevista (MXN)","Target amount (MXN)")}<input required type="number" min={0} max={100000000} step={1} value={draft.target} onChange={e=>change('target',Number(e.target.value))}/></label></div>
    <div className="two-fields"><label>{t('Importe por intención (USD)','Amount per intention (USD)')}<input required type="number" min={1} max={100000} step={1} value={draft.amountUsd} onChange={e=>change('amountUsd',Number(e.target.value))}/></label>
     <label>{t('Meta prevista (USD)','Target (USD)')}<input required type="number" min={0} max={100000000} step={1} value={draft.targetUsd} onChange={e=>change('targetUsd',Number(e.target.value))}/></label></div>
    <p className="chn-intentions-caption">{t('Define los montos en ambas monedas. No se aplican conversiones automáticas.','Set amounts in both currencies. No automatic conversion is applied.')}</p>
    <label>Límite máximo de intenciones para esta causa
     <input type="number" required min={1} max={100000} step={1} value={draft.maxIntentions} onChange={e=>change('maxIntentions',Number(e.target.value))}/>
-    <small>El cupo lo define el organizador al crear la causa. Cada registro pendiente o aprobado utiliza un espacio.</small>
+    <small>{t("El cupo lo define el organizador al crear la causa. Cada registro pendiente o aprobado utiliza un espacio.","The organizer sets the capacity when creating the cause. Pending or approved intentions each use one spot.")}</small>
    </label>
-   <div className="chn-intentions-progress" role="progressbar" aria-label="Progreso de nuevas intenciones" aria-valuemin={0} aria-valuemax={Math.max(1,draft.maxIntentions)} aria-valuenow={0}><span style={{width:'0%'}}/></div>
+   <div className="chn-intentions-progress" role="progressbar" aria-label={t("Progreso de nuevas intenciones","New intention progress")} aria-valuemin={0} aria-valuemax={Math.max(1,draft.maxIntentions)} aria-valuenow={0}><span style={{width:'0%'}}/></div>
    <p className="chn-intentions-caption">Al publicarse comenzará en 0 / {draft.maxIntentions.toLocaleString('es-MX')} intenciones.</p>
-   <div className="chn-cause-projector"><small>Intenciones necesarias para igualar la meta</small><strong>{draft.amount>0?Math.ceil(draft.target/draft.amount).toLocaleString('es-MX'):'—'}</strong><span>Esto es planificación; no representa dinero recibido.</span></div>
-   <label>Fotos de la causa ({photos.length}/10)<div className="upload-zone"><ImagePlus size={25}/><b>Elegir fotos</b><small>1 a 10 imágenes · 5 MB máximo cada una</small><input disabled={busy||photos.length>=10} type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={e=>{addPhotos(Array.from(e.target.files||[]));e.target.value=''}}/></div></label>
+   <div className="chn-cause-projector"><small>{t("Intenciones necesarias para igualar la meta","Intentions needed to meet the goal")}</small><strong>{draft.amount>0?Math.ceil(draft.target/draft.amount).toLocaleString('es-MX'):'—'}</strong><span>{t("Esto es planificación; no representa dinero recibido.","Planning only; this does not represent money received.")}</span></div>
+   <label>Fotos de la causa ({photos.length}/10)<div className="upload-zone"><ImagePlus size={25}/><b>{t("Elegir fotos","Choose photos")}</b><small>{t("1 a 10 imágenes · 5 MB máximo cada una","1 to 10 photos · up to 5 MB each")}</small><input disabled={busy||photos.length>=10} type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={e=>{addPhotos(Array.from(e.target.files||[]));e.target.value=''}}/></div></label>
    {!!preview.length&&<div className="chn-upload-previews">{preview.map((pic,i)=><div className="chn-preview" key={pic.url}><img src={pic.url} alt={'Foto '+(i+1)}/><button type="button" aria-label={'Quitar '+pic.name} onClick={()=>setPhotos(current=>current.filter((_,index)=>index!==i))}><X size={16}/></button></div>)}</div>}
    <div className="notice"><ShieldCheck size={18}/> Los registros generan acuses de intención. No se cobra dinero ni se emiten facturas fiscales.</div>
-   <button className="primary full" type="submit" disabled={busy}>{busy?'Publicando…':'Enviar causa para aprobación'} <ArrowRight size={17}/></button>
+   <button className="primary full" type="submit" disabled={busy}>{busy?t('Publicando…','Publishing…'):t('Enviar causa para aprobación','Submit cause for approval')} <ArrowRight size={17}/></button>
   </form>
  </div>;
 }
@@ -179,11 +179,11 @@ export function CauseAdmin({causes,onUpdate,notify}:{causes:Cause[];onUpdate:()=
     <small>{c.intention_count} / {c.max_intentions} intenciones · {format(c.intention_total,'MXN')} + {format(c.intention_total_usd,'USD')} {t('previstos, no cobrados','planned, not collected')} · {t('Meta','Goal')} {format(c.target_amount,'MXN')} / {format(c.target_amount_usd,'USD')}</small>
     <div className="chn-intentions-progress"><span style={{width:intentionProgress(c)+'%'}}/></div></div>
    <div className="admin-actions">
-    {(c.status==='pending'||c.status==='paused')&&<button type="button" className="small-approve" disabled={!!busy} onClick={()=>{void act(c,'active')}}>Aprobar</button>}
-    {c.status==='active'&&<button type="button" disabled={!!busy} onClick={()=>{void act(c,'paused')}}>Pausar</button>}
-    {['active','pending','paused'].includes(c.status)&&<button type="button" className="danger" disabled={!!busy} onClick={()=>{void act(c,'cancelled')}}>Cancelar</button>}
+    {(c.status==='pending'||c.status==='paused')&&<button type="button" className="small-approve" disabled={!!busy} onClick={()=>{void act(c,'active')}}>{t("Aprobar","Approve")}</button>}
+    {c.status==='active'&&<button type="button" disabled={!!busy} onClick={()=>{void act(c,'paused')}}>{t("Pausar","Pause")}</button>}
+    {['active','pending','paused'].includes(c.status)&&<button type="button" className="danger" disabled={!!busy} onClick={()=>{void act(c,'cancelled')}}>{t("Cancelar","Cancel")}</button>}
    </div>
   </div>)}
-  {!causes.length&&<div className="empty-small">No hay causas creadas todavía.</div>}
+  {!causes.length&&<div className="empty-small">{t("No hay causas creadas todavía.","No causes created yet.")}</div>}
  </div>;
 }
