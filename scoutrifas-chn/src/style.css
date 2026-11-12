@@ -220,3 +220,15 @@ html[data-theme="dark"] .file-button,html[data-theme="dark"] .upload-zone{backgr
 html[data-theme="dark"] .toast{background:#392a48;color:#f7e5fe}
 html[data-theme="dark"] .chn-form-error{background:#522c3a;color:#ffe2e6}
 @media(prefers-reduced-motion:reduce){.chn-intentions-progress>span{transition:none}}
+
+
+/* Compact navigation: keep ES/EN, theme, sign-in and menu accessible on narrow phones. */
+@media(max-width:540px){
+ .nav-container{height:auto;min-height:69px;padding:8px 12px;flex-wrap:wrap;gap:7px 10px}
+ .nav-container .logo{flex:1 1 auto}
+ .nav-container .nav-right{flex:1 1 100%;width:100%;justify-content:flex-end;gap:9px}
+ .nav-container .chn-pref-switches{margin-right:auto}
+ .nav-container .sign-in{font-size:12px;padding:8px 11px;min-height:35px}
+ .nav-links{top:100%}
+}
+html[data-theme=dark] .nav-links.open{background:#241b2e;border-color:#51415d}
