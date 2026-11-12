@@ -39,15 +39,15 @@ function Authentication({mode,setMode,onClose,onSuccess,notify,onApply}:{mode:Au
  const [kind,setKind]=useState<MemberType>('supporter'),[adult,setAdult]=useState(false),[busy,setBusy]=useState(false);
  const submit=async(e:FormEvent)=>{
   e.preventDefault();if(busy)return;
-  if(mode==='signup'&&kind==='scout'&&!isScoutId(id)){notify('El ID scout no tiene el formato correcto.',true);return;}
-  if(mode==='signup'&&kind==='supporter'&&!adult){notify('Este registro es para mayores de edad.',true);return;}
+  if(mode==='signup'&&kind==='scout'&&!isScoutId(id)){notify(t("El ID scout no tiene el formato correcto.","The Scout ID format is invalid."),true);return;}
+  if(mode==='signup'&&kind==='supporter'&&!adult){notify(t("Este registro es para mayores de edad.","This registration is for adults."),true);return;}
   setBusy(true);
   try{
    if(mode==='signup'){
     const session=await backend.signup(email.trim(),password,name.trim(),kind,formatId(id),group.trim(),adult,referral.trim());
-    if(session){await onSuccess();notify('Registro recibido. La comunidad revisará tu solicitud.');onClose();}
-    else{notify('Revisa tu correo de confirmación, después inicia sesión.');setMode('login');}
-   }else{await backend.login(email.trim(),password);await onSuccess();notify('Sesión iniciada correctamente.');onClose();}
+    if(session){await onSuccess();notify(t("Registro recibido. La comunidad revisará tu solicitud.","Account registration received. The community will review your request."));onClose();}
+    else{notify(t("Revisa tu correo de confirmación, después inicia sesión.","Check your confirmation email, then sign in."));setMode('login');}
+   }else{await backend.login(email.trim(),password);await onSuccess();notify(t("Sesión iniciada correctamente.","Signed in successfully."));onClose();}
   }catch(err){notify(friendlyError(err),true)}finally{setBusy(false)}
  };
  return <div className="auth-content">
@@ -84,7 +84,7 @@ function AccessApplication({onClose,notify,onRegister}:{onClose:()=>void;notify:
  const submit=async(e:FormEvent)=>{e.preventDefault();if(busy)return;setBusy(true);setError('');
   try{
    await backend.requestAccess({name,email,kind,scoutId:formatId(scoutId),group,referral,adult,website:honeypot});
-   setSent(true);notify('Solicitud recibida. Puedes crear tu cuenta una vez que administración te haya aprobado.');
+   setSent(true);notify(t("Solicitud recibida. Puedes crear tu cuenta una vez que administración te haya aprobado.","Request received. You can create your account once approved by an administrator."));
   }catch(err){const message=friendlyError(err);setError(message);notify(message,true)}
   finally{setBusy(false)}
  };
@@ -120,7 +120,7 @@ function PasswordRecovery({onClose,notify}:{onClose:()=>void;notify:(message:str
  const submit=async(e:FormEvent)=>{e.preventDefault();if(busy)return;
   if(password!==again){setError('Las contraseñas no coinciden.');return;}
   setBusy(true);setError('');
-  try{await backend.changePassword(password);notify('Contraseña actualizada. Ya puedes usar tu cuenta.');onClose()}
+  try{await backend.changePassword(password);notify(t("Contraseña actualizada. Ya puedes usar tu cuenta.","Password updated. You may now use your account."));onClose()}
   catch(err){const message=friendlyError(err);setError(message);notify(message,true)}
   finally{setBusy(false)}
  };
@@ -139,7 +139,7 @@ function ExistingMemberJoin({done,cancel,onSkip,onApply,notify}:{done:()=>Promis
  const {t}=usePreferences();
  const [busy,setBusy]=useState(false),[error,setError]=useState('');
  const activate=async()=>{if(busy)return;setBusy(true);setError('');
-  try{await backend.enrollExisting();await done();notify('Tu acceso quedó activado. ¡Bienvenido a ScoutApoya!')}
+  try{await backend.enrollExisting();await done();notify(t("Tu acceso quedó activado. ¡Bienvenido a ScoutApoya!","Your access is active. Welcome to ScoutApoya!"))}
   catch(err){const msg=friendlyError(err);setError(msg);notify(msg,true)}
   finally{setBusy(false)}
  };
@@ -160,7 +160,7 @@ function ProfilePage({person,current,onSave,notify,causes,onOpen}:{person:Profil
  const submit=async(e:FormEvent)=>{e.preventDefault();if(busy)return;setBusy(true);
   try{const path=file?await backend.upload(file,person.id,'avatars'):person.avatar_path;
    await backend.updateProfile(person.id,{display_name:name.trim(),group_name:group.trim(),bio:bio.trim(),avatar_path:path});
-   await onSave();notify('Perfil actualizado.');setFile(null);
+   await onSave();notify(t("Perfil actualizado.","Profile updated."));setFile(null);
   }catch(err){notify(friendlyError(err),true)}finally{setBusy(false)}
  };
  return <section className="profile-view">
@@ -233,7 +233,7 @@ function Admin({causes,refresh,notify}:{causes:Cause[];refresh:()=>Promise<void>
    </div>}
    {tab==='causes'&&<CauseAdmin causes={causes.filter(c=>match(c.title,c.owner?.display_name,c.status))} onUpdate={refresh} notify={notify}/>}
   {tab==='access'&&<div className="admin-list">{requests.filter(r=>match(r.display_name,r.email,r.scout_id)).map(r=><div className="admin-line" key={r.id}>
-   <div className="history-symbol"><Users size={20}/></div><div className="grow"><b>{r.display_name}</b><p>{r.email} · {r.member_type==='scout'?'Scout':t('Simpatizante','Supporter')} · {r.scout_id||r.referral_note||'Sin referencia'}</p>
+   <div className="history-symbol"><Users size={20}/></div><div className="grow"><b>{r.display_name}</b><p>{r.email} · {r.member_type==='scout'?'Scout':t('Simpatizante','Supporter')} · {r.scout_id||r.referral_note||t('Sin referencia','No referral')}</p>
    <small>{new Date(r.created_at).toLocaleDateString('es-MX')} · {r.status}</small></div>
    <div className="admin-actions">{r.status==='pending'&&<><button className="small-approve" disabled={busy} onClick={()=>{void act(()=>backend.reviewAccess(r.id,true),'Solicitud aprobada; envía el aviso de registro.')}}>{t("Aprobar","Approve")}</button>
     <button className="danger" disabled={busy} onClick={()=>{void act(()=>backend.reviewAccess(r.id,false),'Solicitud rechazada.')}}>{t("Rechazar","Reject")}</button></>}
@@ -242,7 +242,7 @@ function Admin({causes,refresh,notify}:{causes:Cause[];refresh:()=>Promise<void>
   {tab==='intents'&&<div className="admin-list">{intents.filter(p=>match(names.get(p.user_id),p.recipient_name,p.cause_id?titles.get(p.cause_id):'',p.note)).map(p=><div className="admin-line chn-history" key={p.id}>
    <div className="history-symbol"><Heart size={20}/></div><div className="grow"><b>{names.get(p.user_id)||t('Miembro','Member')} · {p.cause_id?titles.get(p.cause_id)||t('Causa archivada','Archived cause'):t('Apoyo anterior','Previous support')}</b>
     <p>{t("Folio","Reference")} {ackLabel(p.acknowledgment_no)} · {t("Destinatario:","Recipient:")} {p.recipient_name||t(t('No especificado','Not specified'),'Not specified')}</p>
-    <small>{p.status==='approved'?t('Aprobada','Approved'):p.status==='rejected'?t('Rechazada','Rejected'):p.status==='pending'?t('Pendiente','Pending'):t('Registro anterior','Previous record')} · {new Date(p.created_at).toLocaleString('es-MX')}</small></div>
+    <small>{p.status==='approved'?t('Aprobada','Approved'):p.status==='rejected'?t('Rechazada','Rejected'):p.status==='pending'?t('Pendiente','Pending'):t(t('Registro anterior','Previous record'),'Previous record')} · {new Date(p.created_at).toLocaleString('es-MX')}</small></div>
    <strong className="history-amount">{format(p.amount,p.currency_code||'MXN')}<small style={{display:'block',fontSize:11,fontWeight:400}}>{t("No cobrado","Not collected")}</small></strong>
   </div>)}{!intents.length&&<p className="empty-small">{t("Aún no hay intenciones.","No intentions yet.")}</p>}</div>}
   {tab==='users'&&<div className="admin-list">{members.filter(m=>match(m.display_name,m.scout_id,m.member_type)).map(m=><div className="admin-line user-line" key={m.id}>
@@ -291,8 +291,8 @@ export default function App(){
  const openApplication=()=>{setAuth(null);setApplication(true)};
  const openApprovedRegistration=()=>{setApplication(false);setAuth('signup')};
  const show=(next:Screen)=>{if(next==='setup'&&needsEnrollment){setupDismissed.current=false;setScreen('setup');return}
-  if(next!=='explore'&&!access){if(!viewer)setAuth('login');else notify('Tu cuenta todavía está pendiente de aprobación.',true);return}
-  if(next==='admin'&&viewer?.role!=='admin'){notify('Área privada.',true);return}
+  if(next!=='explore'&&!access){if(!viewer)setAuth('login');else notify(t("Tu cuenta todavía está pendiente de aprobación.","Your account is still awaiting approval."),true);return}
+  if(next==='admin'&&viewer?.role!=='admin'){notify(t("Área privada.","Private area."),true);return}
   setScreen(next);setProfileTarget(null);setMenu(false);window.scrollTo({top:0,behavior:'smooth'});
  };
  const explore=()=>{if(!access){if(needsEnrollment)show('setup');else openApplication();return}
@@ -300,7 +300,7 @@ export default function App(){
  };
  const create=()=>{if(!viewer){openApplication();return}if(!canPublish(viewer)){notify('Solo organizadores aprobados pueden proponer causas.',true);return}setCreatingCause(true)};
  const profile=(p:Profile)=>{setProfileTarget(p);setScreen('profile');window.scrollTo({top:0,behavior:'smooth'})};
- const logout=async()=>{try{await backend.logout();setupDismissed.current=false;setViewer(null);setNeedsEnrollment(false);setCauses([]);setMySupport([]);setSelectedCause(null);setScreen('explore');notify('Sesión cerrada.')}catch(err){notify(friendlyError(err),true)}};
+ const logout=async()=>{try{await backend.logout();setupDismissed.current=false;setViewer(null);setNeedsEnrollment(false);setCauses([]);setMySupport([]);setSelectedCause(null);setScreen('explore');notify(t("Sesión cerrada.","Signed out."))}catch(err){notify(friendlyError(err),true)}};
  const mine=causes.filter(c=>c.owner_id===viewer?.id);
  return <>
   <header className="site-header"><div className="nav-container">
@@ -316,7 +316,7 @@ export default function App(){
     {viewer?<button className="account" onClick={()=>profile(viewer)}><Avatar user={viewer} size={34}/><span>{viewer.display_name.split(' ')[0]}</span><ChevronDown size={15}/></button>:
      needsEnrollment?<button className="sign-in" onClick={()=>show('setup')}>{t("Activar cuenta","Activate account")}</button>:
      cloud?<button className="sign-in" onClick={()=>setAuth('login')}><LogIn size={17}/> {t("Iniciar sesión","Sign in")}</button>:null}
-    <button className="menu-button" onClick={()=>setMenu(!menu)} aria-label="Abrir menú"><Menu size={24}/></button>
+    <button className="menu-button" onClick={()=>setMenu(!menu)} aria-label={t("Abrir menú","Open menu")}><Menu size={24}/></button>
    </div>
   </div></header>
   <main>{screen==='explore'?<>
@@ -362,7 +362,7 @@ export default function App(){
    <div className="activity-block"><h3><Heart size={20}/> {t("Mis intenciones","My intentions")} <span>{mySupport.length}</span></h3>
     {mySupport.length?mySupport.map(p=><div className="activity-row" key={p.id}>
      <b>{causes.find(c=>c.id===p.cause_id)?.title||'Apoyo al Grupo 4'} · {format(p.amount,p.currency_code||'MXN')}</b>
-     <small>Folio {ackLabel(p.acknowledgment_no)} · {p.status==='approved'?t('Aprobada','Approved'):p.status==='rejected'?t('Rechazada','Rejected'):p.status==='pending'?'Pendiente de aprobación':t('Registro anterior','Previous record')} · Sin pago</small>
+     <small>Folio {ackLabel(p.acknowledgment_no)} · {p.status==='approved'?t('Aprobada','Approved'):p.status==='rejected'?t('Rechazada','Rejected'):p.status==='pending'?t('Pendiente de aprobación','Pending approval'):t(t('Registro anterior','Previous record'),'Previous record')} · Sin pago</small>
      <small>Destinatario: {p.recipient_name||t(t('No especificado','Not specified'),'Not specified')} · {new Date(p.created_at).toLocaleDateString('es-MX')}</small>
      <button className="chn-cause-history-action" onClick={()=>setAck({intent_id:p.id,ack_no:p.acknowledgment_no,cause_title:causes.find(c=>c.id===p.cause_id)?.title||'Apoyo al Grupo 4',issued_at:p.created_at,intent_status:p.status,recipient_name:p.recipient_name,amount_value:p.amount,currency_code:p.currency_code||'MXN'})}>{t("Ver acuse numerado","View numbered acknowledgment")}</button>
     </div>):<p className="empty-small">{t("No has registrado ninguna intención de apoyo.","You haven't registered any support intentions.")}</p>}

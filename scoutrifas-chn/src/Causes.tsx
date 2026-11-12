@@ -22,7 +22,7 @@ export function CauseGallery({causes,onOpen,includeDrafts=false}:{causes:Cause[]
     <h3>{c.title}</h3><p>{c.description}</p>
     <div className="chn-cause-amount"><span>{t("Apoyo sugerido por registro","Suggested support per entry")}</span><strong>{format(c.fixed_support_amount,'MXN')}{c.fixed_support_amount_usd!=null&&<> · {format(c.fixed_support_amount_usd,'USD')}</>}</strong></div>
     <div className="chn-cause-meta"><span><Users size={15}/> {c.intention_count} / {c.max_intentions} intenciones</span><span><Clock3 size={15}/> {remaining(c.end_at,language)}</span></div>
-    <div className="chn-intentions-progress" role="progressbar" aria-label={'Intenciones de '+c.title} aria-valuenow={c.intention_count} aria-valuemin={0} aria-valuemax={c.max_intentions}>
+    <div className="chn-intentions-progress" role="progressbar" aria-label={t('Intenciones de ','Intentions for ')+c.title} aria-valuenow={c.intention_count} aria-valuemin={0} aria-valuemax={c.max_intentions}>
      <span style={{width:intentionProgress(c)+'%'}}/>
     </div><small className="chn-intentions-caption">{c.intention_count>=c.max_intentions?t('Cupo completo','Capacity reached'):c.max_intentions-c.intention_count+' espacios disponibles'}</small>
     <span className="chn-cause-action">{t("Conocer la causa","Explore cause")} <ArrowRight size={17}/></span>
@@ -67,14 +67,14 @@ export function CauseDetail({cause,onClose,onUpdated,onAcknowledged,notify}:{cau
  const open=causeIsActive(cause)&&cause.intention_count<cause.max_intentions;
  const submit=async(e:FormEvent)=>{e.preventDefault();if(busy||!open)return;setBusy(true);
   try{const result=await backend.registerCauseIntent(cause.id,recipientId,currency,note);
-   notify('Acuse '+ackLabel(result.ack_no)+' emitido. La intención queda pendiente de tu aprobación; no se realizó ningún cobro.');
+   notify(t('Acuse ','Acknowledgment ')+ackLabel(result.ack_no)+t(' emitido. La intención queda pendiente de aprobación; no se realizó ningún cobro.',' issued. This intention is pending approval; no payment was processed.'));
    await onUpdated();onClose();onAcknowledged(result);
   }catch(err){notify(friendlyError(err),true)}finally{setBusy(false)}
  };
  return <div className="chn-cause-detail">
   <div className="chn-cause-detail-gallery">
    <img src={imageUrl(cause.image_paths[photo])||''} alt={cause.title}/>
-   {cause.image_paths.length>1&&<div className="chn-cause-photos">{cause.image_paths.map((path,index)=><button key={path} className={index===photo?'active':''} aria-label={'Ver imagen '+(index+1)} type="button" onClick={()=>setPhoto(index)}><img src={imageUrl(path)} alt=""/></button>)}</div>}
+   {cause.image_paths.length>1&&<div className="chn-cause-photos">{cause.image_paths.map((path,index)=><button key={path} className={index===photo?'active':''} aria-label={t('Ver imagen ','View image ')+(index+1)} type="button" onClick={()=>setPhoto(index)}><img src={imageUrl(path)} alt=""/></button>)}</div>}
   </div>
   <div className="chn-cause-detail-info">
    <span className="kicker">{t("CAUSA PARA EL GRUPO 4","CAUSE FOR GROUP 4")}</span><h2>{cause.title}</h2>
@@ -121,20 +121,20 @@ export function CauseEditor({user,onClose,onSaved,notify}:{user:Profile;onClose:
  const change=<K extends keyof CauseDraft>(key:K,value:CauseDraft[K])=>setDraft(d=>({...d,[key]:value}));
  const addPhotos=(files:File[])=>{
   const valid=files.filter(f=>['image/png','image/jpeg','image/webp'].includes(f.type)&&f.size<=5*1024*1024);
-  if(valid.length!==files.length)notify('Solo JPG, PNG o WebP, máximo 5 MB por foto.',true);
-  if(photos.length+valid.length>10)notify('El máximo es 10 fotografías.',true);
+  if(valid.length!==files.length)notify(t("Solo JPG, PNG o WebP, máximo 5 MB por foto.","Only JPG, PNG, or WebP, up to 5 MB per photo."),true);
+  if(photos.length+valid.length>10)notify(t("El máximo es 10 fotografías.","You can upload up to 10 photos."),true);
   setPhotos(previous=>[...previous,...valid.slice(0,10-previous.length)]);
  };
  const submit=async(e:FormEvent)=>{e.preventDefault();if(busy)return;
-  if(new Date(draft.endAt).getTime()<=Date.now()+3600000){notify('El cierre debe ser al menos una hora en el futuro.',true);return}
-  if(photos.length<1||photos.length>10){notify('Agrega de 1 a 10 fotos.',true);return}
-  if(!Number.isInteger(draft.maxIntentions)||draft.maxIntentions<1||draft.maxIntentions>100000){notify('El límite debe estar entre 1 y 100,000 intenciones.',true);return}
-  if(!Number.isInteger(draft.amount)||draft.amount<20||draft.amount>100000||!Number.isInteger(draft.amountUsd)||draft.amountUsd<1||draft.amountUsd>100000){notify('Revisa los montos por moneda.',true);return}
+  if(new Date(draft.endAt).getTime()<=Date.now()+3600000){notify(t("El cierre debe ser al menos una hora en el futuro.","The closing time must be at least one hour in the future."),true);return}
+  if(photos.length<1||photos.length>10){notify(t("Agrega de 1 a 10 fotos.","Add 1 to 10 photos."),true);return}
+  if(!Number.isInteger(draft.maxIntentions)||draft.maxIntentions<1||draft.maxIntentions>100000){notify(t("El límite debe estar entre 1 y 100,000 intenciones.","The intention limit must be between 1 and 100,000."),true);return}
+  if(!Number.isInteger(draft.amount)||draft.amount<20||draft.amount>100000||!Number.isInteger(draft.amountUsd)||draft.amountUsd<1||draft.amountUsd>100000){notify(t("Revisa los montos por moneda.","Check the amounts for each currency."),true);return}
   setBusy(true);const uploaded:string[]=[];
   try{
    for(const photo of photos)uploaded.push(await backend.upload(photo,user.id,'listings'));
    await backend.createCause({...draft,endAt:new Date(draft.endAt).toISOString()},uploaded);
-   notify('Causa enviada a revisión. Las aportaciones no están habilitadas como pagos.');
+   notify(t("Causa enviada a revisión. Las aportaciones no están habilitadas como pagos.","Cause submitted for review. Contributions are not enabled as payments."));
    await onSaved();onClose();
   }catch(err){if(uploaded.length)await backend.removeUploaded(uploaded,'listings').catch(()=>{});notify(friendlyError(err),true)}
   finally{setBusy(false)}
@@ -156,10 +156,10 @@ export function CauseEditor({user,onClose,onSaved,notify}:{user:Profile;onClose:
     <small>{t("El cupo lo define el organizador al crear la causa. Cada registro pendiente o aprobado utiliza un espacio.","The organizer sets the capacity when creating the cause. Pending or approved intentions each use one spot.")}</small>
    </label>
    <div className="chn-intentions-progress" role="progressbar" aria-label={t("Progreso de nuevas intenciones","New intention progress")} aria-valuemin={0} aria-valuemax={Math.max(1,draft.maxIntentions)} aria-valuenow={0}><span style={{width:'0%'}}/></div>
-   <p className="chn-intentions-caption">Al publicarse comenzará en 0 / {draft.maxIntentions.toLocaleString('es-MX')} intenciones.</p>
+   <p className="chn-intentions-caption">{t('Al publicarse comenzará en','When published, it will start at')} 0 / {draft.maxIntentions.toLocaleString(language==='es'?'es-MX':'en-US')} {t('intenciones.','intentions.')}</p>
    <div className="chn-cause-projector"><small>{t("Intenciones necesarias para igualar la meta","Intentions needed to meet the goal")}</small><strong>{draft.amount>0?Math.ceil(draft.target/draft.amount).toLocaleString('es-MX'):'—'}</strong><span>{t("Esto es planificación; no representa dinero recibido.","Planning only; this does not represent money received.")}</span></div>
    <label>Fotos de la causa ({photos.length}/10)<div className="upload-zone"><ImagePlus size={25}/><b>{t("Elegir fotos","Choose photos")}</b><small>{t("1 a 10 imágenes · 5 MB máximo cada una","1 to 10 photos · up to 5 MB each")}</small><input disabled={busy||photos.length>=10} type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={e=>{addPhotos(Array.from(e.target.files||[]));e.target.value=''}}/></div></label>
-   {!!preview.length&&<div className="chn-upload-previews">{preview.map((pic,i)=><div className="chn-preview" key={pic.url}><img src={pic.url} alt={'Foto '+(i+1)}/><button type="button" aria-label={'Quitar '+pic.name} onClick={()=>setPhotos(current=>current.filter((_,index)=>index!==i))}><X size={16}/></button></div>)}</div>}
+   {!!preview.length&&<div className="chn-upload-previews">{preview.map((pic,i)=><div className="chn-preview" key={pic.url}><img src={pic.url} alt={'Foto '+(i+1)}/><button type="button" aria-label={t('Quitar ','Remove ')+pic.name} onClick={()=>setPhotos(current=>current.filter((_,index)=>index!==i))}><X size={16}/></button></div>)}</div>}
    <div className="notice"><ShieldCheck size={18}/> {t("Los registros generan acuses de intención. No se cobra dinero ni se emiten facturas fiscales.","Registrations generate intention acknowledgments. No payments are collected or tax invoices issued.")}</div>
    <button className="primary full" type="submit" disabled={busy}>{busy?t('Publicando…','Publishing…'):t('Enviar causa para aprobación','Submit cause for approval')} <ArrowRight size={17}/></button>
   </form>
@@ -170,7 +170,7 @@ export function CauseAdmin({causes,onUpdate,notify}:{causes:Cause[];onUpdate:()=
  const {t,format}=usePreferences();
  const [busy,setBusy]=useState<string|null>(null);
  const act=async(cause:Cause,action:'active'|'paused'|'cancelled')=>{
-  setBusy(cause.id);try{await backend.reviewCause(cause.id,action);await onUpdate();notify('Estado de causa actualizado.')}
+  setBusy(cause.id);try{await backend.reviewCause(cause.id,action);await onUpdate();notify(t("Estado de causa actualizado.","Cause status updated."))}
   catch(err){notify(friendlyError(err),true)}finally{setBusy(null)}
  };
  return <div className="admin-list">
