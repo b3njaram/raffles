@@ -27,6 +27,16 @@ Las operaciones del servidor usan bloqueo de fila \`FOR UPDATE\` para evitar sob
 
 Migración: \`supabase/migrations/20261110235500_intention_limits_and_review.sql\`.
 
+## Mejoras para comunidad y organizadores
+
+- **Búsqueda avanzada de causas:** filtros por categoría y disponibilidad; orden por fecha de publicación, proximidad de cierre, progreso y lugares libres. Solo se filtran causas que Supabase ya autorizó a consultar.
+- **Enlaces privados:** el botón «Compartir» crea una URL tipo \`?causa=<uuid>\`. Un enlace **no concede acceso**; el receptor debe tener cuenta verificada y permisos sobre esa causa. El enlace abre directamente la causa después de iniciar sesión.
+- **Borradores de creación:** el formulario guarda automáticamente título, descripción, importes, metas, categoría, fecha y cupo en \`localStorage\`, con una clave distinta por usuario. Las **fotos no se guardan**; al regresar, deben seleccionarse otra vez. Un control permite descartar el borrador. En computadoras compartidas, estos borradores pueden quedar disponibles localmente hasta descartarlos; no escribas datos sensibles.
+- **Consulta de acuses:** en «Mis apoyos» se puede buscar por folio, causa o destinatario, y filtrar por estado. El acuse permite copiar el número además de imprimir o guardar PDF.
+- **Prevención de doble clic:** el envío de una intención bloquea reenvíos simultáneos desde el mismo formulario. La base sigue asignando los números únicos y controlando cupos atómicamente; no constituye garantía de deduplicación entre dispositivos o reintentos después de un fallo de red.
+
+No se agregaron cuentas bancarias ni cobros. Todas las intenciones y acuses son registros, no confirmaciones de pago.
+
 ## Funciones activas
 
 - Solicitud de acceso y aprobación administrativa antes de registrar una cuenta.
