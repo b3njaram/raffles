@@ -1,9 +1,9 @@
-import {useEffect,useMemo,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 import type {FormEvent} from 'react';
-import {ArrowRight,Clock3,Heart,ImagePlus,Printer,ShieldCheck,Users,X} from 'lucide-react';
+import {ArrowRight,Check,Clock3,Copy,Heart,ImagePlus,Printer,Share2,ShieldCheck,Users,X} from 'lucide-react';
 import {backend,friendlyError,imageUrl} from './backend';
 import type {Cause,CauseAcknowledgment,CauseDraft,Category,Currency,Profile,RecipientOption} from './types';
-import {ackLabel,categories,categoryLabel,causeAmount,causeIsActive,causeTarget,causeTotal,intentionProgress,remaining} from './types';
+import {ackLabel,categories,categoryLabel,causeAmount,causeDraftKey,causeIsActive,causeTarget,causeTotal,intentionProgress,remaining} from './types';
 import {usePreferences} from './Preferences';
 import './causes.css';
 
@@ -34,6 +34,12 @@ export function CauseGallery({causes,onOpen,includeDrafts=false}:{causes:Cause[]
 
 export function AckPanel({data,onClose}:{data:AckDisplay;onClose:()=>void}){
  const {t,format,date}=usePreferences();
+ const [copied,setCopied]=useState(false);
+ const copy=async()=>{
+  const number=ackLabel(data.ack_no);
+  try{await navigator.clipboard.writeText(number);setCopied(true)}
+  catch{window.prompt(t('Copia tu folio','Copy your reference'),number)}
+ };
  return <div className="chn-ack-modal">
   <div className="chn-ack-print">
    <div className="chn-ack-heading"><Heart size={35}/><div><strong>{t("SCOUTAPOYA · GRUPO 4 CHN","SCOUTAPOYA · GROUP 4 CHN")}</strong><small>{t("Acuse de intención de apoyo","Support intention acknowledgment")}</small></div></div>
@@ -48,12 +54,13 @@ export function AckPanel({data,onClose}:{data:AckDisplay;onClose:()=>void}){
    </div>
    <div className="chn-ack-footer">{t("El folio es único. No proporciona contraprestaciones. Si se efectúa una donación real, su comprobante correspondiente debe ser emitido por la entidad receptora conforme a la normativa aplicable.","This acknowledgment number is unique and grants no benefits in return. Any receipt for a genuine donation must be issued by the recipient entity under applicable rules.")}</div>
   </div>
-  <div className="chn-ack-actions"><button type="button" className="primary" onClick={()=>window.print()}><Printer size={18}/> {t("Imprimir / guardar PDF","Print / save PDF")}</button><button className="secondary" type="button" onClick={onClose}>{t("Cerrar","Close")}</button></div>
+  <div className="chn-ack-actions"><button type="button" className="secondary" onClick={()=>{void copy()}}>{copied?<Check size={18}/>:<Copy size={18}/>} {copied?t('Copiado','Copied'):t('Copiar folio','Copy reference')}</button><button type="button" className="primary" onClick={()=>window.print()}><Printer size={18}/> {t("Imprimir / guardar PDF","Print / save PDF")}</button><button className="secondary" type="button" onClick={onClose}>{t("Cerrar","Close")}</button></div>
  </div>;
 }
 
-export function CauseDetail({cause,onClose,onUpdated,onAcknowledged,notify}:{cause:Cause;onClose:()=>void;onUpdated:()=>Promise<void>;onAcknowledged:(d:CauseAcknowledgment)=>void;notify:Notify}){
+export function CauseDetail({cause,onClose,onShare,onUpdated,onAcknowledged,notify}:{cause:Cause;onClose:()=>void;onShare:()=>void;onUpdated:()=>Promise<void>;onAcknowledged:(d:CauseAcknowledgment)=>void;notify:Notify}){
  const {t,format,language}=usePreferences();
+ const submitLock=useRef(false);
  const [currency,setCurrency]=useState<Currency>('MXN');
  const [photo,setPhoto]=useState(0),[note,setNote]=useState(''),[busy,setBusy]=useState(false);
  const [recipients,setRecipients]=useState<RecipientOption[]>([]),[recipientId,setRecipientId]=useState(cause.owner_id);
@@ -65,11 +72,11 @@ export function CauseDetail({cause,onClose,onUpdated,onAcknowledged,notify}:{cau
   return()=>{mounted=false};
  },[cause.id,cause.owner_id,notify]);
  const open=causeIsActive(cause)&&cause.intention_count<cause.max_intentions;
- const submit=async(e:FormEvent)=>{e.preventDefault();if(busy||!open)return;setBusy(true);
+ const submit=async(e:FormEvent)=>{e.preventDefault();if(submitLock.current||!open)return;submitLock.current=true;setBusy(true);
   try{const result=await backend.registerCauseIntent(cause.id,recipientId,currency,note);
    notify(t('Acuse ','Acknowledgment ')+ackLabel(result.ack_no)+t(' emitido. La intención queda pendiente de aprobación; no se realizó ningún cobro.',' issued. This intention is pending approval; no payment was processed.'));
    await onUpdated();onClose();onAcknowledged(result);
-  }catch(err){notify(friendlyError(err),true)}finally{setBusy(false)}
+  }catch(err){notify(friendlyError(err),true)}finally{submitLock.current=false;setBusy(false)}
  };
  return <div className="chn-cause-detail">
   <div className="chn-cause-detail-gallery">
@@ -77,7 +84,8 @@ export function CauseDetail({cause,onClose,onUpdated,onAcknowledged,notify}:{cau
    {cause.image_paths.length>1&&<div className="chn-cause-photos">{cause.image_paths.map((path,index)=><button key={path} className={index===photo?'active':''} aria-label={t('Ver imagen ','View image ')+(index+1)} type="button" onClick={()=>setPhoto(index)}><img src={imageUrl(path)} alt=""/></button>)}</div>}
   </div>
   <div className="chn-cause-detail-info">
-   <span className="kicker">{t("CAUSA PARA EL GRUPO 4","CAUSE FOR GROUP 4")}</span><h2>{cause.title}</h2>
+   <div className="chn-cause-heading"><div><span className="kicker">{t("CAUSA PARA EL GRUPO 4","CAUSE FOR GROUP 4")}</span><h2>{cause.title}</h2></div>
+     <button className="chn-share-cause" type="button" onClick={onShare}><Share2 size={17}/>{t('Compartir','Share')}</button></div>
    <p className="chn-cause-description">{cause.description}</p>
    <div className="chn-cause-amount-box"><span>{t("Monto fijado por el organizador para cada intención","Amount set by the organizer for each intention")}</span><strong>{format(cause.fixed_support_amount,'MXN')}{cause.fixed_support_amount_usd!=null&&<> / {format(cause.fixed_support_amount_usd,'USD')}</>}</strong><small>{t("Puedes registrar varias intenciones mientras haya cupo disponible. No hay cobros en esta página.","You may register multiple intentions while capacity remains. No payments are collected here.")}</small></div>
    <div className="chn-cause-metrics"><span><Heart size={16}/> {cause.intention_count} / {cause.max_intentions} intenciones registradas</span><span><Clock3 size={16}/> {remaining(cause.end_at,language)}</span></div>
@@ -112,9 +120,29 @@ export function CauseDetail({cause,onClose,onUpdated,onAcknowledged,notify}:{cau
  </div>;
 }
 
+const defaultDraft:CauseDraft={title:'',description:'',category:'Aventura',endAt:'',amount:100,amountUsd:10,target:3000,targetUsd:300,maxIntentions:100};
 export function CauseEditor({user,onClose,onSaved,notify}:{user:Profile;onClose:()=>void;onSaved:()=>Promise<void>;notify:Notify}){
  const {t,language}=usePreferences();
- const [draft,setDraft]=useState<CauseDraft>({title:'',description:'',category:'Aventura',endAt:'',amount:100,amountUsd:10,target:3000,targetUsd:300,maxIntentions:100});
+ const draftKey=causeDraftKey(user.id);
+ const [draft,setDraft]=useState<CauseDraft>(()=>{
+  try{
+   const stored=localStorage.getItem(draftKey);
+   if(!stored)return {...defaultDraft};
+   const data=JSON.parse(stored) as Partial<CauseDraft>;
+   if(typeof data.title!=='string'||typeof data.description!=='string'||!categories.includes(data.category as Category))return {...defaultDraft};
+   return {
+    title:data.title,description:data.description,category:data.category as Category,
+    endAt:typeof data.endAt==='string'?data.endAt:'',
+    amount:Number.isInteger(data.amount)?Number(data.amount):100,
+    amountUsd:Number.isInteger(data.amountUsd)?Number(data.amountUsd):10,
+    target:Number.isInteger(data.target)?Number(data.target):3000,
+    targetUsd:Number.isInteger(data.targetUsd)?Number(data.targetUsd):300,
+    maxIntentions:Number.isInteger(data.maxIntentions)?Number(data.maxIntentions):100
+   };
+  }catch{return {...defaultDraft}}
+ });
+ useEffect(()=>{try{localStorage.setItem(draftKey,JSON.stringify(draft))}catch{}},[draftKey,draft]);
+ const discard=()=>{try{localStorage.removeItem(draftKey)}catch{}onClose()};
  const [photos,setPhotos]=useState<File[]>([]),[busy,setBusy]=useState(false);
  const preview=useMemo(()=>photos.map(file=>({name:file.name,url:URL.createObjectURL(file)})),[photos]);
  useEffect(()=>()=>{preview.forEach(p=>URL.revokeObjectURL(p.url))},[preview]);
@@ -134,6 +162,7 @@ export function CauseEditor({user,onClose,onSaved,notify}:{user:Profile;onClose:
   try{
    for(const photo of photos)uploaded.push(await backend.upload(photo,user.id,'listings'));
    await backend.createCause({...draft,endAt:new Date(draft.endAt).toISOString()},uploaded);
+   try{localStorage.removeItem(draftKey)}catch{}
    notify(t("Causa enviada a revisión. Las aportaciones no están habilitadas como pagos.","Cause submitted for review. Contributions are not enabled as payments."));
    await onSaved();onClose();
   }catch(err){if(uploaded.length)await backend.removeUploaded(uploaded,'listings').catch(()=>{});notify(friendlyError(err),true)}
@@ -141,6 +170,7 @@ export function CauseEditor({user,onClose,onSaved,notify}:{user:Profile;onClose:
  };
  return <div className="chn-cause-editor"><span className="kicker">{t("PROYECTOS · GRUPO 4 CHN","PROJECTS · GROUP 4 CHN")}</span><h2>{t("Crear una causa","Create a cause")}</h2>
   <p>{t("Comparte una necesidad concreta y define un monto fijo por intención de apoyo. Es una iniciativa comunitaria sin contraprestaciones.","Describe a real need and define fixed support intention amounts. This is a community initiative without benefits in return.")}</p>
+   <div className="chn-draft-tip"><span><Check size={16}/>{t('Borrador guardado automáticamente en este dispositivo. Las fotos deben agregarse de nuevo al regresar.','Draft auto-saved on this device. Photos must be re-added when you return.')}</span><button type="button" onClick={discard}>{t('Descartar borrador','Discard draft')}</button></div>
   <form className="form-col" onSubmit={submit}>
    <label>{t("Nombre de la causa","Cause title")}<input required minLength={5} maxLength={110} value={draft.title} onChange={e=>change('title',e.target.value)} placeholder={t("Ej. Transporte para campamento","E.g., camp transportation")}/></label>
    <label>{t("¿Para qué se usarían los recursos?","How would the funds be used?")}<textarea required minLength={20} maxLength={2500} rows={4} value={draft.description} onChange={e=>change('description',e.target.value)} placeholder={t("Describe el proyecto y cómo beneficiaría al Grupo 4.","Describe your project and how it helps Group 4.")}/></label>
