@@ -6,6 +6,7 @@ import type {AccessRequest,Cause,MemberType,Profile,SupportIntent} from './types
 import {ackLabel,canPublish,canViewCatalogue,formatId,isScoutId,money} from './types';
 import {AckPanel,CauseAdmin,CauseDetail,CauseEditor,CauseGallery} from './Causes';
 import type {AckDisplay} from './Causes';
+import {PreferenceSwitches,usePreferences} from './Preferences';
 import './style.css';
 
 type Screen='explore'|'setup'|'mine'|'activity'|'profile'|'admin';
@@ -20,16 +21,18 @@ function Modal({children,onClose,width='560px'}:{children:ReactNode;onClose:()=>
  useEffect(()=>{const h=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose()};window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h)},[onClose]);
  return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}} role="presentation">
   <div className="modal" style={{maxWidth:width}} role="dialog" aria-modal="true">
-   <button type="button" className="modal-close icon-button" aria-label="Cerrar" onClick={onClose}><X size={20}/></button>{children}
+   <button type="button" className="modal-close icon-button" aria-label={t('Cerrar','Close')} onClick={onClose}><X size={20}/></button>{children}
   </div></div>;
 }
 function KindPicker({kind,setKind}:{kind:MemberType;setKind:(k:MemberType)=>void}){
+ const {t}=usePreferences();
  return <div className="mode-cards chn-kind-picker">
-  <button type="button" className={kind==='scout'?'active':''} onClick={()=>setKind('scout')}><Fleur size={24}/><b>Soy Scout</b><small>Miembro de la provincia</small></button>
-  <button type="button" className={kind==='supporter'?'active':''} onClick={()=>setKind('supporter')}><Heart size={23}/><b>Quiero apoyar</b><small>Amigos y simpatizantes</small></button>
+  <button type="button" className={kind==='scout'?'active':''} onClick={()=>setKind('scout')}><Fleur size={24}/><b>{t("Soy Scout","I'm a Scout")}</b><small>{t("Miembro de la provincia","Regional Scout member")}</small></button>
+  <button type="button" className={kind==='supporter'?'active':''} onClick={()=>setKind('supporter')}><Heart size={23}/><b>{t("Quiero apoyar","I want to help")}</b><small>{t("Amigos y simpatizantes","Friends and supporters")}</small></button>
  </div>;
 }
 function Authentication({mode,setMode,onClose,onSuccess,notify,onApply}:{mode:AuthMode;setMode:(m:AuthMode)=>void;onClose:()=>void;onSuccess:()=>Promise<void>;notify:(s:string,e?:boolean)=>void;onApply:()=>void}){
+ const {t}=usePreferences();
  const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[name,setName]=useState('');
  const [id,setId]=useState('CHN-'),[group,setGroup]=useState(''),[referral,setReferral]=useState('');
  const [kind,setKind]=useState<MemberType>('supporter'),[adult,setAdult]=useState(false),[busy,setBusy]=useState(false);
@@ -48,31 +51,32 @@ function Authentication({mode,setMode,onClose,onSuccess,notify,onApply}:{mode:Au
  };
  return <div className="auth-content">
   <div className="modal-brand"><span className="brand-icon"><Fleur size={25}/></span><span>SCOUT<span className="brand-strong">APOYA</span> <sup>CHN</sup></span></div>
-  <h2>{mode==='signup'?'Crear cuenta aprobada':'Bienvenido de vuelta'}</h2>
-  <p className="subtle">{mode==='signup'?'Utiliza el mismo correo y tipo de miembro que autorizó administración.':'Inicia sesión para ver las actividades.'}</p>
-  <div className="switcher"><button type="button" className={mode==='login'?'selected':''} onClick={()=>setMode('login')}>Iniciar sesión</button><button type="button" className={mode==='signup'?'selected':''} onClick={()=>setMode('signup')}>Crear cuenta</button></div>
+  <h2>{mode==='signup'?t('Crear cuenta aprobada','Create approved account'):t('Bienvenido de vuelta','Welcome back')}</h2>
+  <p className="subtle">{mode==='signup'?t('Utiliza el mismo correo y tipo de miembro que autorizó administración.','Use the email and membership type approved by the administrator.'):t('Inicia sesión para ver las actividades.','Sign in to view community activities.')}</p>
+  <div className="switcher"><button type="button" className={mode==='login'?'selected':''} onClick={()=>setMode('login')}>{t("Iniciar sesión","Sign in")}</button><button type="button" className={mode==='signup'?'selected':''} onClick={()=>setMode('signup')}>{t("Crear cuenta","Create account")}</button></div>
   <form className="form-col" onSubmit={submit}>
    {mode==='signup'&&<><KindPicker kind={kind} setKind={setKind}/>
-    <label>Nombre a mostrar<input required minLength={2} maxLength={65} value={name} onChange={e=>setName(e.target.value)} autoComplete="name"/></label>
+    <label>{t("Nombre a mostrar","Display name")}<input required minLength={2} maxLength={65} value={name} onChange={e=>setName(e.target.value)} autoComplete="name"/></label>
     {kind==='scout'?<>
-      <label>ID scout<input required maxLength={16} value={id} onChange={e=>setId(e.target.value.toUpperCase())} pattern="CHN-?[A-Za-z0-9]{4,12}" placeholder="CHN-000123"/></label>
-      <label>Grupo scout<input maxLength={70} value={group} onChange={e=>setGroup(e.target.value)} placeholder="Grupo y sección"/></label>
-     </>:<label>¿Quién te invitó? (opcional)<input maxLength={120} value={referral} onChange={e=>setReferral(e.target.value)} placeholder="Nombre o grupo que conoces"/></label>}
+      <label>{t("ID scout","Scout ID")}<input required maxLength={16} value={id} onChange={e=>setId(e.target.value.toUpperCase())} pattern="CHN-?[A-Za-z0-9]{4,12}" placeholder="CHN-000123"/></label>
+      <label>{t("Grupo scout","Scout group")}<input maxLength={70} value={group} onChange={e=>setGroup(e.target.value)} placeholder={t('Grupo y sección','Group and section')}/></label>
+     </>:<label>{t("¿Quién te invitó? (opcional)","Who invited you? (optional)")}<input maxLength={120} value={referral} onChange={e=>setReferral(e.target.value)} placeholder={t('Nombre o grupo que conoces','Name or group you know')}/></label>}
     <label className="chn-check"><input type="checkbox" checked={adult} onChange={e=>setAdult(e.target.checked)}/> Confirmo que tengo 18 años o más{kind==='scout'?'':''}.</label>
    </>}
-   <label>Correo electrónico<input required type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="tu@correo.com"/></label>
-   <label>Contraseña<input required minLength={8} type="password" autoComplete={mode==='signup'?'new-password':'current-password'} value={password} onChange={e=>setPassword(e.target.value)}/></label>
-   <button className="primary full" type="submit" disabled={busy}>{busy?'Procesando…':mode==='signup'?'Crear mi cuenta':'Entrar a ScoutApoya'}<ArrowRight size={17}/></button>
+   <label>{t("Correo electrónico","Email")}<input required type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="tu@correo.com"/></label>
+   <label>{t("Contraseña","Password")}<input required minLength={8} type="password" autoComplete={mode==='signup'?'new-password':'current-password'} value={password} onChange={e=>setPassword(e.target.value)}/></label>
+   <button className="primary full" type="submit" disabled={busy}>{busy?t('Procesando…','Processing…'):mode==='signup'?t('Crear mi cuenta','Create my account'):t('Entrar a ScoutApoya','Enter ScoutApoya')}<ArrowRight size={17}/></button>
   </form>
   {mode==='login'&&<button className="chn-forgot-button" type="button" disabled={busy} onClick={async()=>{
     try{setBusy(true);await backend.sendPasswordReset(email);notify('Si el correo está registrado, recibirás un enlace para restablecer tu contraseña.');onClose();}
     catch(err){notify(friendlyError(err),true)}finally{setBusy(false)}
-   }}>¿Olvidaste tu contraseña?</button>}
-  <p className="auth-foot">La cuenta solo se crea después de la aprobación previa. No se procesan pagos en este sitio.</p>
-  <button className="chn-forgot-button" type="button" onClick={onApply}>Solicitar acceso por primera vez</button>
+   }}>{t("¿Olvidaste tu contraseña?","Forgot your password?")}</button>}
+  <p className="auth-foot">{t("La cuenta solo se crea después de la aprobación previa. No se procesan pagos en este sitio.","Accounts are created only after prior approval. No payments are processed here.")}</p>
+  <button className="chn-forgot-button" type="button" onClick={onApply}>{t("Solicitar acceso por primera vez","Request access for the first time")}</button>
  </div>;
 }
 function AccessApplication({onClose,notify,onRegister}:{onClose:()=>void;notify:(s:string,error?:boolean)=>void;onRegister:()=>void}){
+ const {t}=usePreferences();
  const [kind,setKind]=useState<MemberType>('supporter'),[name,setName]=useState(''),[email,setEmail]=useState('');
  const [scoutId,setScoutId]=useState('CHN-'),[group,setGroup]=useState(''),[referral,setReferral]=useState('');
  const [adult,setAdult]=useState(false),[honeypot,setHoneypot]=useState(''),[busy,setBusy]=useState(false),[sent,setSent]=useState(false),[error,setError]=useState('');
@@ -85,31 +89,32 @@ function AccessApplication({onClose,notify,onRegister}:{onClose:()=>void;notify:
  };
  return <div className="auth-content">
   <div className="modal-brand"><span className="brand-icon"><Fleur size={25}/></span><span>SCOUT<span className="brand-strong">APOYA</span> <sup>CHN</sup></span></div>
-  {sent?<div className="chn-request-done"><CheckCircle2 size={40}/><h2>¡Solicitud recibida!</h2>
-    <p>La administración revisará tus datos. Cuando recibas la aprobación, podrás crear tu cuenta con este mismo correo o activar una cuenta existente.</p>
+  {sent?<div className="chn-request-done"><CheckCircle2 size={40}/><h2>{t("¡Solicitud recibida!","Request received!")}</h2>
+    <p>{t("La administración revisará tus datos. Cuando recibas la aprobación, podrás crear tu cuenta con este mismo correo o activar una cuenta existente.","An administrator will review your information. Once approved, create your account using the same email or activate an existing account.")}</p>
     <button type="button" className="primary full" onClick={onClose}>Entendido <Check size={17}/></button>
-    <button type="button" className="chn-forgot-button" onClick={onRegister}>Ya me aprobaron · Crear cuenta</button>
+    <button type="button" className="chn-forgot-button" onClick={onRegister}>{t("Ya me aprobaron · Crear cuenta","Already approved · Create account")}</button>
    </div>:<>
-   <h2>Solicitar acceso</h2>
-   <p className="subtle">Cuéntanos un poco sobre ti. Enviaremos tu solicitud a revisión antes de habilitar el registro.</p>
+   <h2>{t("Solicitar acceso","Request access")}</h2>
+   <p className="subtle">{t("Cuéntanos un poco sobre ti. Enviaremos tu solicitud a revisión antes de habilitar el registro.","Tell us a little about yourself. We'll review your application before you can register.")}</p>
    {error&&<div className="chn-form-error" role="alert"><Flag size={18}/>{error}</div>}
    <form className="form-col" onSubmit={submit}>
     <KindPicker kind={kind} setKind={setKind}/>
-    <label>Tu nombre<input required minLength={2} maxLength={65} autoComplete="name" value={name} onChange={e=>setName(e.target.value)}/></label>
-    <label>Correo para el registro<input required type="email" maxLength={254} autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)}/></label>
-    {kind==='scout'?<><label>ID scout<input required maxLength={16} pattern="CHN-?[A-Za-z0-9]{4,12}" value={scoutId} onChange={e=>setScoutId(e.target.value.toUpperCase())}/></label>
-     <label>Grupo y sección<input maxLength={70} value={group} onChange={e=>setGroup(e.target.value)}/></label></>:
-     <label>¿Quién te invitó? (opcional)<input maxLength={120} value={referral} onChange={e=>setReferral(e.target.value)}/></label>}
+    <label>{t("Tu nombre","Your name")}<input required minLength={2} maxLength={65} autoComplete="name" value={name} onChange={e=>setName(e.target.value)}/></label>
+    <label>{t("Correo para el registro","Registration email")}<input required type="email" maxLength={254} autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)}/></label>
+    {kind==='scout'?<><label>{t("ID scout","Scout ID")}<input required maxLength={16} pattern="CHN-?[A-Za-z0-9]{4,12}" value={scoutId} onChange={e=>setScoutId(e.target.value.toUpperCase())}/></label>
+     <label>{t("Grupo y sección","Group and section")}<input maxLength={70} value={group} onChange={e=>setGroup(e.target.value)}/></label></>:
+     <label>{t("¿Quién te invitó? (opcional)","Who invited you? (optional)")}<input maxLength={120} value={referral} onChange={e=>setReferral(e.target.value)}/></label>}
     <label className="chn-check"><input type="checkbox" checked={adult} onChange={e=>setAdult(e.target.checked)}/> Confirmo ser mayor de edad{kind==='scout'?'':''}.</label>
-    <label className="chn-honeypot" aria-hidden="true">Sitio web<input tabIndex={-1} autoComplete="off" value={honeypot} onChange={e=>setHoneypot(e.target.value)}/></label>
-    <button type="submit" className="primary full" disabled={busy}>{busy?'Enviando…':'Enviar solicitud de acceso'} <ArrowRight size={17}/></button>
+    <label className="chn-honeypot" aria-hidden="true">{t("Sitio web","Website")}<input tabIndex={-1} autoComplete="off" value={honeypot} onChange={e=>setHoneypot(e.target.value)}/></label>
+    <button type="submit" className="primary full" disabled={busy}>{busy?t('Enviando…','Sending…'):t('Enviar solicitud de acceso','Submit access request')} <ArrowRight size={17}/></button>
    </form>
-   <p className="auth-foot">El acceso se concede únicamente tras aprobación. Este sitio no procesa cobros.</p>
-   <button type="button" className="chn-forgot-button" onClick={onRegister}>¿Ya te aprobaron? Crear cuenta</button>
+   <p className="auth-foot">{t("El acceso se concede únicamente tras aprobación. Este sitio no procesa cobros.","Access requires prior approval. This site does not process payments.")}</p>
+   <button type="button" className="chn-forgot-button" onClick={onRegister}>{t("¿Ya te aprobaron? Crear cuenta","Already approved? Create account")}</button>
   </>}
  </div>;
 }
 function PasswordRecovery({onClose,notify}:{onClose:()=>void;notify:(message:string,isError?:boolean)=>void}){
+ const {t}=usePreferences();
  const [password,setPassword]=useState(''),[again,setAgain]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const submit=async(e:FormEvent)=>{e.preventDefault();if(busy)return;
   if(password!==again){setError('Las contraseñas no coinciden.');return;}
@@ -120,16 +125,17 @@ function PasswordRecovery({onClose,notify}:{onClose:()=>void;notify:(message:str
  };
  return <div className="auth-content">
    <div className="modal-brand"><span className="brand-icon"><Fleur size={25}/></span><span>SCOUT<span className="brand-strong">APOYA</span> <sup>CHN</sup></span></div>
-   <h2>Crear nueva contraseña</h2><p className="subtle">Tu enlace de recuperación fue validado. Elige una contraseña segura para tu cuenta.</p>
+   <h2>{t("Crear nueva contraseña","Set a new password")}</h2><p className="subtle">{t("Tu enlace de recuperación fue validado. Elige una contraseña segura para tu cuenta.","Your recovery link was verified. Choose a secure password.")}</p>
    {error&&<div className="chn-form-error" role="alert"><Flag size={18}/>{error}</div>}
    <form className="form-col" onSubmit={submit}>
-    <label>Nueva contraseña<input type="password" required minLength={10} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)}/></label>
-    <label>Confirmar contraseña<input type="password" required minLength={10} autoComplete="new-password" value={again} onChange={e=>setAgain(e.target.value)}/></label>
-    <button disabled={busy} className="primary full" type="submit">{busy?'Actualizando…':'Guardar nueva contraseña'}<Check size={17}/></button>
+    <label>{t("Nueva contraseña","New password")}<input type="password" required minLength={10} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)}/></label>
+    <label>{t("Confirmar contraseña","Confirm password")}<input type="password" required minLength={10} autoComplete="new-password" value={again} onChange={e=>setAgain(e.target.value)}/></label>
+    <button disabled={busy} className="primary full" type="submit">{busy?t('Actualizando…','Updating…'):t('Guardar nueva contraseña','Save new password')}<Check size={17}/></button>
    </form>
  </div>;
 }
 function ExistingMemberJoin({done,cancel,onSkip,onApply,notify}:{done:()=>Promise<void>;cancel:()=>Promise<void>;onSkip:()=>void;onApply:()=>void;notify:(s:string,e?:boolean)=>void}){
+ const {t}=usePreferences();
  const [busy,setBusy]=useState(false),[error,setError]=useState('');
  const activate=async()=>{if(busy)return;setBusy(true);setError('');
   try{await backend.enrollExisting();await done();notify('Tu acceso quedó activado. ¡Bienvenido a ScoutApoya!')}
@@ -137,16 +143,17 @@ function ExistingMemberJoin({done,cancel,onSkip,onApply,notify}:{done:()=>Promis
   finally{setBusy(false)}
  };
  return <div className="auth-content">
-  <span className="kicker">ACCESO A TU COMUNIDAD</span><h2>Activa tu acceso aprobado</h2>
-  <p className="subtle">Ya tienes una sesión en Supabase. Para ingresar a ScoutApoya, primero necesitas una solicitud aprobada con el mismo correo que utilizaste al iniciar sesión.</p>
+  <span className="kicker">{t("ACCESO A TU COMUNIDAD","COMMUNITY ACCESS")}</span><h2>{t("Activa tu acceso aprobado","Activate your approved access")}</h2>
+  <p className="subtle">{t("Ya tienes una sesión en Supabase. Para ingresar a ScoutApoya, primero necesitas una solicitud aprobada con el mismo correo que utilizaste al iniciar sesión.","You are already signed in to Supabase. To enter ScoutApoya, you first need an approved request using the same email.")}</p>
   {error&&<div className="chn-form-error" role="alert"><Flag size={18}/>{error}</div>}
-  <button type="button" className="primary full" disabled={busy} onClick={()=>{void activate()}}>{busy?'Comprobando…':'Activar acceso aprobado'} <CheckCircle2 size={17}/></button>
-  <button type="button" className="secondary full" onClick={onApply}>No he enviado solicitud · Solicitar acceso</button>
-  <div className="chn-setup-options"><button className="text-logout" type="button" onClick={onSkip}>Volver al inicio</button><button className="text-logout" type="button" onClick={()=>{void cancel()}}>Cerrar sesión</button></div>
+  <button type="button" className="primary full" disabled={busy} onClick={()=>{void activate()}}>{busy?t('Comprobando…','Checking…'):t('Activar acceso aprobado','Activate approved access')} <CheckCircle2 size={17}/></button>
+  <button type="button" className="secondary full" onClick={onApply}>{t("No he enviado solicitud · Solicitar acceso","I haven't applied · Request access")}</button>
+  <div className="chn-setup-options"><button className="text-logout" type="button" onClick={onSkip}>{t("Volver al inicio","Back to home")}</button><button className="text-logout" type="button" onClick={()=>{void cancel()}}>{t("Cerrar sesión","Sign out")}</button></div>
  </div>;
 }
 
 function ProfilePage({person,current,onSave,notify,causes,onOpen}:{person:Profile;current:boolean;onSave:()=>Promise<void>;notify:(s:string,e?:boolean)=>void;causes:Cause[];onOpen:(c:Cause)=>void}){
+ const {t}=usePreferences();
  const [name,setName]=useState(person.display_name),[group,setGroup]=useState(person.group_name),[bio,setBio]=useState(person.bio),[file,setFile]=useState<File|null>(null),[busy,setBusy]=useState(false);
  useEffect(()=>{setName(person.display_name);setGroup(person.group_name);setBio(person.bio);setFile(null)},[person.id,person.display_name,person.group_name,person.bio]);
  const submit=async(e:FormEvent)=>{e.preventDefault();if(busy)return;setBusy(true);
@@ -158,19 +165,20 @@ function ProfilePage({person,current,onSave,notify,causes,onOpen}:{person:Profil
  return <section className="profile-view">
   <div className="profile-banner"><Fleur size={76}/><div className="topography"/></div>
   <div className="profile-head"><Avatar user={person} size={102}/><div><div className="inline-heading"><h2>{person.display_name}</h2>{person.verified?<span className="verified"><CheckCircle2 size={15}/> Verificado</span>:<span className="pending"><Clock3 size={15}/> Por verificar</span>}</div>
-   <p>{person.member_type==='supporter'?'Simpatizante':person.scout_id||'Scout'} · {person.group_name||'Grupo 4 de Chihuahua Norte'}</p></div></div>
-  {current?<form className="form-col profile-edit" onSubmit={submit}><h3>Editar mi perfil</h3>
-   <label>Foto de perfil<div className="file-button"><Upload size={18}/>{file?.name||'Elegir imagen'}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>setFile(e.target.files?.[0]||null)}/></div></label>
-   <label>Nombre<input required minLength={2} maxLength={65} value={name} onChange={e=>setName(e.target.value)}/></label>
-   {person.member_type==='scout'&&<label>Grupo scout<input maxLength={70} value={group} onChange={e=>setGroup(e.target.value)}/></label>}
-   <label>Sobre mí<textarea maxLength={320} rows={3} value={bio} onChange={e=>setBio(e.target.value)}/></label>
-   <button className="primary" disabled={busy} type="submit">{busy?'Guardando…':'Guardar cambios'}<Check size={16}/></button>
-  </form>:<div className="public-bio"><h3>Sobre esta persona</h3><p>{person.bio||'Miembro de nuestra comunidad.'}</p></div>}
+   <p>{person.member_type==='supporter'?t('Simpatizante','Supporter'):person.scout_id||'Scout'} · {person.group_name||'Grupo 4 de Chihuahua Norte'}</p></div></div>
+  {current?<form className="form-col profile-edit" onSubmit={submit}><h3>{t("Editar mi perfil","Edit profile")}</h3>
+   <label>{t("Foto de perfil","Profile photo")}<div className="file-button"><Upload size={18}/>{file?.name||'Elegir imagen'}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>setFile(e.target.files?.[0]||null)}/></div></label>
+   <label>{t("Nombre","Name")}<input required minLength={2} maxLength={65} value={name} onChange={e=>setName(e.target.value)}/></label>
+   {person.member_type==='scout'&&<label>{t("Grupo scout","Scout group")}<input maxLength={70} value={group} onChange={e=>setGroup(e.target.value)}/></label>}
+   <label>{t("Sobre mí","About me")}<textarea maxLength={320} rows={3} value={bio} onChange={e=>setBio(e.target.value)}/></label>
+   <button className="primary" disabled={busy} type="submit">{busy?t('Guardando…','Saving…'):t('Guardar cambios','Save changes')}<Check size={16}/></button>
+  </form>:<div className="public-bio"><h3>{t("Sobre esta persona","About this member")}</h3><p>{person.bio||'Miembro de nuestra comunidad.'}</p></div>}
   <div className="public-listings"><h3>Causas de {person.display_name.split(' ')[0]}</h3><CauseGallery causes={causes} includeDrafts={current} onOpen={onOpen}/></div>
  </section>;
 }
 
 function Admin({causes,refresh,notify}:{causes:Cause[];refresh:()=>Promise<void>;notify:(s:string,e?:boolean)=>void}){
+ const {t,format,date}=usePreferences();
  const [members,setMembers]=useState<Profile[]>([]),[requests,setRequests]=useState<AccessRequest[]>([]),[intents,setIntents]=useState<SupportIntent[]>([]);
  const [tab,setTab]=useState<'review'|'access'|'causes'|'intents'|'users'>('review'),[query,setQuery]=useState(''),[busy,setBusy]=useState(false);
  const reload=useCallback(async()=>{try{const [m,r,p]=await Promise.all([backend.members(),backend.accessRequests(),backend.supportIntents()]);
@@ -183,68 +191,70 @@ function Admin({causes,refresh,notify}:{causes:Cause[];refresh:()=>Promise<void>
   catch(err){notify(friendlyError(err),true)}finally{setBusy(false)}};
  const csv=()=>{
   const csvCell=(v:unknown)=>'"'+String(v??'').replace(/"/g,'""').replace(/^[=+\-@]/,"'$&")+'"';
-  const rows=[['Fecha','Folio','Usuario','Causa','Destinatario','Monto previsto MXN','Aprobación','Pago'],...intents.map(p=>[p.created_at,ackLabel(p.acknowledgment_no),names.get(p.user_id)||'',
-    p.cause_id?titles.get(p.cause_id)||'Causa archivada':'Apoyo anterior',p.recipient_name||'No especificado',p.amount,p.status,'No cobrado'])];
+  const rows=[['Fecha','Folio','Usuario',t('Causa','Cause'),'Destinatario','Moneda','Monto previsto','Aprobación','Pago'],...intents.map(p=>[p.created_at,ackLabel(p.acknowledgment_no),names.get(p.user_id)||'',
+    p.cause_id?titles.get(p.cause_id)||'Causa archivada':'Apoyo anterior',p.recipient_name||t('No especificado','Not specified'),p.currency_code||'MXN',p.amount,p.status,'No cobrado'])];
   const url=URL.createObjectURL(new Blob([String.fromCharCode(65279)+rows.map(r=>r.map(csvCell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));
   const a=document.createElement('a');a.href=url;a.download='causas-grupo4.csv';a.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
  };
  return <section className="admin-view">
-  <div className="section-title"><div><span className="kicker">CONTROL COMUNITARIO</span><h2>Panel de administración</h2><p>Revisa usuarios, causas y apoyos del Grupo 4.</p></div><ShieldCheck size={38} className="admin-shield"/></div>
+  <div className="section-title"><div><span className="kicker">{t("CONTROL COMUNITARIO","COMMUNITY CONTROL")}</span><h2>{t("Panel de administración","Admin dashboard")}</h2><p>{t("Revisa usuarios, causas y apoyos del Grupo 4.","Review members, causes, and support intentions for Group 4.")}</p></div><ShieldCheck size={38} className="admin-shield"/></div>
   <div className="stat-grid chn-stats">
-   <div className="stat"><Users/><b>{requests.filter(r=>r.status==='pending').length}</b><span>Solicitudes pendientes</span></div>
-   <div className="stat"><Heart/><b>{causes.filter(c=>c.status==='pending').length}</b><span>Causas por revisar</span></div>
-   <div className="stat"><CheckCircle2/><b>{members.length}</b><span>Miembros registrados</span></div>
-   <div className="stat"><Heart/><b>{intents.filter(p=>p.status==='pending').length}</b><span>Intenciones por aprobar</span></div>
-   <div className="stat"><CheckCircle2/><b>{intents.filter(p=>p.status==='approved').length}</b><span>Registros aprobados</span></div>
-   <div className="stat"><BarChart3/><b>{money(intents.reduce((n,p)=>n+p.amount,0))}</b><span>Previsto, no cobrado</span></div>
+   <div className="stat"><Users/><b>{requests.filter(r=>r.status==='pending').length}</b><span>{t("Solicitudes pendientes","Pending applications")}</span></div>
+   <div className="stat"><Heart/><b>{causes.filter(c=>c.status==='pending').length}</b><span>{t("Causas por revisar","Causes to review")}</span></div>
+   <div className="stat"><CheckCircle2/><b>{members.length}</b><span>{t("Miembros registrados","Registered members")}</span></div>
+   <div className="stat"><Heart/><b>{intents.filter(p=>p.status==='pending').length}</b><span>{t("Intenciones por aprobar","Intentions to approve")}</span></div>
+   <div className="stat"><CheckCircle2/><b>{intents.filter(p=>p.status==='approved').length}</b><span>{t("Registros aprobados","Approved records")}</span></div>
+   <div className="stat"><BarChart3/><b>{format(intents.filter(p=>p.currency_code==='MXN'&&p.status!=='rejected').reduce((n,p)=>n+p.amount,0),'MXN')}</b>
+    <strong>{format(intents.filter(p=>p.currency_code==='USD'&&p.status!=='rejected').reduce((n,p)=>n+p.amount,0),'USD')}</strong><span>{t("Previsto, no cobrado","Planned, not collected")}</span></div>
   </div>
-  <div className="admin-toolbar"><button className="secondary" onClick={()=>{void reload();void refresh()}}>Actualizar</button></div>
+  <div className="admin-toolbar"><button className="secondary" onClick={()=>{void reload();void refresh()}}>{t("Actualizar","Refresh")}</button></div>
   <div className="tabs admin-tabs">
    <button className={tab==='review'?'active':''} onClick={()=>setTab('review')}>Revisar intenciones ({intents.filter(p=>p.status==='pending').length})</button>
-   <button className={tab==='access'?'active':''} onClick={()=>setTab('access')}>Solicitudes</button>
-   <button className={tab==='causes'?'active':''} onClick={()=>setTab('causes')}>Causas</button>
-   <button className={tab==='intents'?'active':''} onClick={()=>setTab('intents')}>Apoyos</button>
-   <button className={tab==='users'?'active':''} onClick={()=>setTab('users')}>Usuarios</button>
+   <button className={tab==='access'?'active':''} onClick={()=>setTab('access')}>{t("Solicitudes","Applications")}</button>
+   <button className={tab==='causes'?'active':''} onClick={()=>setTab('causes')}>{t("Causas","Causes")}</button>
+   <button className={tab==='intents'?'active':''} onClick={()=>setTab('intents')}>{t("Apoyos","Support")}</button>
+   <button className={tab==='users'?'active':''} onClick={()=>setTab('users')}>{t("Usuarios","Members")}</button>
   </div>
-  <div className="admin-filter"><label className="search-field"><Search size={18}/><input aria-label="Buscar" placeholder="Buscar nombre, correo o causa" value={query} onChange={e=>setQuery(e.target.value)}/></label>
-   {tab==='intents'&&<button className="secondary" onClick={csv}>Exportar CSV</button>}</div>
+  <div className="admin-filter"><label className="search-field"><Search size={18}/><input aria-label="Buscar" placeholder={t('Buscar nombre, correo o causa','Search name, email, or cause')} value={query} onChange={e=>setQuery(e.target.value)}/></label>
+   {tab==='intents'&&<button className="secondary" onClick={csv}>{t("Exportar CSV","Export CSV")}</button>}</div>
   {tab==='review'&&<div className="admin-list">
     {intents.filter(p=>p.status==='pending'&&match(names.get(p.user_id),p.recipient_name,p.cause_id?titles.get(p.cause_id):'',p.acknowledgment_no)).map(p=><div className="admin-line chn-history" key={p.id}>
      <div className="history-symbol"><Heart size={20}/></div>
-     <div className="grow"><b>{ackLabel(p.acknowledgment_no)} · {titles.get(p.cause_id||'')||'Causa'}</b>
-      <p>Solicita: {names.get(p.user_id)||'Miembro'} · Destinatario: {p.recipient_name||'No especificado'}</p>
-      <small>{money(p.amount)} previsto · {new Date(p.created_at).toLocaleString('es-MX')} · Pendiente de aprobación</small>
+     <div className="grow"><b>{ackLabel(p.acknowledgment_no)} · {titles.get(p.cause_id||'')||t('Causa','Cause')}</b>
+      <p>Solicita: {names.get(p.user_id)||t('Miembro','Member')} · Destinatario: {p.recipient_name||t('No especificado','Not specified')}</p>
+      <small>{format(p.amount,p.currency_code||'MXN')} previsto · {new Date(p.created_at).toLocaleString('es-MX')} · Pendiente de aprobación</small>
       {p.note&&<p>{p.note}</p>}
      </div><div className="admin-actions">
-      <button disabled={busy} className="small-approve" type="button" onClick={()=>{void act(()=>backend.reviewCauseIntent(p.id,true),'Intención aprobada. Esto no confirma dinero recibido.')}}>Aprobar intención</button>
-      <button disabled={busy} className="danger" type="button" onClick={()=>{if(window.confirm('¿Rechazar esta intención y liberar un espacio en la causa? El folio seguirá en el historial.'))void act(()=>backend.reviewCauseIntent(p.id,false),'Intención rechazada; se liberó un espacio.')}}>Rechazar</button>
+      <button disabled={busy} className="small-approve" type="button" onClick={()=>{void act(()=>backend.reviewCauseIntent(p.id,true),'Intención aprobada. Esto no confirma dinero recibido.')}}>{t("Aprobar intención","Approve intention")}</button>
+      <button disabled={busy} className="danger" type="button" onClick={()=>{if(window.confirm('¿Rechazar esta intención y liberar un espacio en la causa? El folio seguirá en el historial.'))void act(()=>backend.reviewCauseIntent(p.id,false),'Intención rechazada; se liberó un espacio.')}}>{t("Rechazar","Reject")}</button>
      </div></div>)}
-     {!intents.some(p=>p.status==='pending')&&<p className="empty-small">No hay intenciones pendientes de revisión.</p>}
+     {!intents.some(p=>p.status==='pending')&&<p className="empty-small">{t("No hay intenciones pendientes de revisión.","No intentions pending review.")}</p>}
    </div>}
    {tab==='causes'&&<CauseAdmin causes={causes.filter(c=>match(c.title,c.owner?.display_name,c.status))} onUpdate={refresh} notify={notify}/>}
   {tab==='access'&&<div className="admin-list">{requests.filter(r=>match(r.display_name,r.email,r.scout_id)).map(r=><div className="admin-line" key={r.id}>
-   <div className="history-symbol"><Users size={20}/></div><div className="grow"><b>{r.display_name}</b><p>{r.email} · {r.member_type==='scout'?'Scout':'Simpatizante'} · {r.scout_id||r.referral_note||'Sin referencia'}</p>
+   <div className="history-symbol"><Users size={20}/></div><div className="grow"><b>{r.display_name}</b><p>{r.email} · {r.member_type==='scout'?'Scout':t('Simpatizante','Supporter')} · {r.scout_id||r.referral_note||'Sin referencia'}</p>
    <small>{new Date(r.created_at).toLocaleDateString('es-MX')} · {r.status}</small></div>
-   <div className="admin-actions">{r.status==='pending'&&<><button className="small-approve" disabled={busy} onClick={()=>{void act(()=>backend.reviewAccess(r.id,true),'Solicitud aprobada; envía el aviso de registro.')}}>Aprobar</button>
-    <button className="danger" disabled={busy} onClick={()=>{void act(()=>backend.reviewAccess(r.id,false),'Solicitud rechazada.')}}>Rechazar</button></>}
-    {r.status==='approved'&&<a className="chn-email-link" href={'mailto:'+r.email+'?subject='+encodeURIComponent('ScoutApoya: acceso aprobado')+'&body='+encodeURIComponent('Tu solicitud fue aprobada. Visita '+window.location.origin+' y crea tu cuenta con el correo aprobado.')}>Preparar aviso</a>}</div>
-  </div>)}{!requests.length&&<p className="empty-small">No hay solicitudes.</p>}</div>}
+   <div className="admin-actions">{r.status==='pending'&&<><button className="small-approve" disabled={busy} onClick={()=>{void act(()=>backend.reviewAccess(r.id,true),'Solicitud aprobada; envía el aviso de registro.')}}>{t("Aprobar","Approve")}</button>
+    <button className="danger" disabled={busy} onClick={()=>{void act(()=>backend.reviewAccess(r.id,false),'Solicitud rechazada.')}}>{t("Rechazar","Reject")}</button></>}
+    {r.status==='approved'&&<a className="chn-email-link" href={'mailto:'+r.email+'?subject='+encodeURIComponent('ScoutApoya: acceso aprobado')+'&body='+encodeURIComponent('Tu solicitud fue aprobada. Visita '+window.location.origin+' y crea tu cuenta con el correo aprobado.')}>{t("Preparar aviso","Prepare email")}</a>}</div>
+  </div>)}{!requests.length&&<p className="empty-small">{t("No hay solicitudes.","No applications.")}</p>}</div>}
   {tab==='intents'&&<div className="admin-list">{intents.filter(p=>match(names.get(p.user_id),p.recipient_name,p.cause_id?titles.get(p.cause_id):'',p.note)).map(p=><div className="admin-line chn-history" key={p.id}>
-   <div className="history-symbol"><Heart size={20}/></div><div className="grow"><b>{names.get(p.user_id)||'Miembro'} · {p.cause_id?titles.get(p.cause_id)||'Causa archivada':'Apoyo anterior'}</b>
-    <p>Folio {ackLabel(p.acknowledgment_no)} · Destinatario: {p.recipient_name||'No especificado'}</p>
-    <small>{p.status==='approved'?'Aprobada':p.status==='rejected'?'Rechazada':p.status==='pending'?'Pendiente':'Registro anterior'} · {new Date(p.created_at).toLocaleString('es-MX')}</small></div>
-   <strong className="history-amount">{money(p.amount)}<small style={{display:'block',fontSize:11,fontWeight:400}}>No cobrado</small></strong>
-  </div>)}{!intents.length&&<p className="empty-small">Aún no hay intenciones.</p>}</div>}
+   <div className="history-symbol"><Heart size={20}/></div><div className="grow"><b>{names.get(p.user_id)||t('Miembro','Member')} · {p.cause_id?titles.get(p.cause_id)||'Causa archivada':'Apoyo anterior'}</b>
+    <p>Folio {ackLabel(p.acknowledgment_no)} · Destinatario: {p.recipient_name||t('No especificado','Not specified')}</p>
+    <small>{p.status==='approved'?t('Aprobada','Approved'):p.status==='rejected'?t('Rechazada','Rejected'):p.status==='pending'?t('Pendiente','Pending'):'Registro anterior'} · {new Date(p.created_at).toLocaleString('es-MX')}</small></div>
+   <strong className="history-amount">{format(p.amount,p.currency_code||'MXN')}<small style={{display:'block',fontSize:11,fontWeight:400}}>{t("No cobrado","Not collected")}</small></strong>
+  </div>)}{!intents.length&&<p className="empty-small">{t("Aún no hay intenciones.","No intentions yet.")}</p>}</div>}
   {tab==='users'&&<div className="admin-list">{members.filter(m=>match(m.display_name,m.scout_id,m.member_type)).map(m=><div className="admin-line user-line" key={m.id}>
-   <Avatar user={m} size={48}/><div className="grow"><b>{m.display_name}</b><p>{m.member_type==='supporter'?'Simpatizante':m.scout_id} · {m.group_name}</p></div>
-   <div className="admin-actions">{m.role==='admin'?<span className="verified">Administrador único</span>:<button disabled={busy} className={m.verified?'danger':'small-approve'}
+   <Avatar user={m} size={48}/><div className="grow"><b>{m.display_name}</b><p>{m.member_type==='supporter'?t('Simpatizante','Supporter'):m.scout_id} · {m.group_name}</p></div>
+   <div className="admin-actions">{m.role==='admin'?<span className="verified">{t("Administrador único","Sole administrator")}</span>:<button disabled={busy} className={m.verified?'danger':'small-approve'}
     onClick={()=>{void act(()=>backend.reviewUser(m.id,!m.verified),'Estado de acceso actualizado.')}}>{m.verified?'Revocar acceso':'Aprobar acceso'}</button>}</div>
   </div>)}</div>}
-  <p className="detail-disclaimer">Los importes son intenciones de apoyo, no dinero recaudado. Este sitio no procesa pagos ni emite documentos fiscales.</p>
+  <p className="detail-disclaimer">{t("Los importes son intenciones de apoyo, no dinero recaudado. Este sitio no procesa pagos ni emite documentos fiscales.","Amounts represent intentions, not funds raised. This site does not process payments or issue tax documents.")}</p>
  </section>;
 }
 
 export default function App(){
+ const {t,format,date}=usePreferences();
  const setupDismissed=useRef(false);
  const [viewer,setViewer]=useState<Profile|null>(null),[needsEnrollment,setNeedsEnrollment]=useState(false),[causes,setCauses]=useState<Cause[]>([]),[loading,setLoading]=useState(true);
  const [screen,setScreen]=useState<Screen>('explore'),[profileTarget,setProfileTarget]=useState<Profile|null>(null),[selectedCause,setSelectedCause]=useState<Cause|null>(null);
@@ -293,69 +303,69 @@ export default function App(){
  const mine=causes.filter(c=>c.owner_id===viewer?.id);
  return <>
   <header className="site-header"><div className="nav-container">
-   <button className="logo" type="button" onClick={()=>show('explore')} aria-label="ScoutApoya inicio"><span className="logo-mark"><Fleur size={29}/></span><span className="logo-name">SCOUT<span>APOYA</span><small>GRUPO 4 · CHN</small></span></button>
+   <button className="logo" type="button" onClick={()=>show('explore')} aria-label="ScoutApoya inicio"><span className="logo-mark"><Fleur size={29}/></span><span className="logo-name">SCOUT<span>APOYA</span><small>{t("GRUPO 4 · CHN","GROUP 4 · CHN")}</small></span></button>
    <nav className={menu?'nav-links open':'nav-links'}>
-    <button className={screen==='explore'?'nav-active':''} onClick={()=>show('explore')}>Inicio</button>
-    <button onClick={explore}>Causas</button>
-    {access&&canPublish(viewer)&&<button className={screen==='mine'?'nav-active':''} onClick={()=>show('mine')}>Mis causas</button>}
-    {access&&<button className={screen==='activity'?'nav-active':''} onClick={()=>show('activity')}>Mis apoyos</button>}
-    {access&&viewer?.role==='admin'&&<button className={screen==='admin'?'nav-active':''} onClick={()=>show('admin')}>Administración</button>}
+    <button className={screen==='explore'?'nav-active':''} onClick={()=>show('explore')}>{t("Inicio","Home")}</button>
+    <button onClick={explore}>{t("Causas","Causes")}</button>
+    {access&&canPublish(viewer)&&<button className={screen==='mine'?'nav-active':''} onClick={()=>show('mine')}>{t("Mis causas","My causes")}</button>}
+    {access&&<button className={screen==='activity'?'nav-active':''} onClick={()=>show('activity')}>{t("Mis apoyos","My support")}</button>}
+    {access&&viewer?.role==='admin'&&<button className={screen==='admin'?'nav-active':''} onClick={()=>show('admin')}>{t("Administración","Admin")}</button>}
    </nav>
-   <div className="nav-right">{canPublish(viewer)&&<button className="create-nav" onClick={create}><Plus size={18}/> Crear causa</button>}
+   <div className="nav-right"><PreferenceSwitches/>{canPublish(viewer)&&<button className="create-nav" onClick={create}><Plus size={18}/> Crear causa</button>}
     {viewer?<button className="account" onClick={()=>profile(viewer)}><Avatar user={viewer} size={34}/><span>{viewer.display_name.split(' ')[0]}</span><ChevronDown size={15}/></button>:
-     needsEnrollment?<button className="sign-in" onClick={()=>show('setup')}>Activar cuenta</button>:
+     needsEnrollment?<button className="sign-in" onClick={()=>show('setup')}>{t("Activar cuenta","Activate account")}</button>:
      cloud?<button className="sign-in" onClick={()=>setAuth('login')}><LogIn size={17}/> Iniciar sesión</button>:null}
     <button className="menu-button" onClick={()=>setMenu(!menu)} aria-label="Abrir menú"><Menu size={24}/></button>
    </div>
   </div></header>
   <main>{screen==='explore'?<>
    <div className="hero-shell"><section className="hero"><div className="hero-photo" style={{backgroundImage:"linear-gradient(90deg,rgba(33,23,44,.93),rgba(33,23,44,.42)),url('"+sampleHero+"')"}}/>
-    <div className="hero-content"><span className="hero-label">⚜ GRUPO 4 · CHIHUAHUA NORTE</span>
-     <h1>Una buena acción<br/>puede cambiar <em>vidas.</em></h1>
-     <p>Conoce y apoya las causas de nuestra comunidad scout. Transporte, formación, materiales y aventuras: cada proyecto comienza con una buena acción.</p>
+    <div className="hero-content"><span className="hero-label">{t("⚜ GRUPO 4 · CHIHUAHUA NORTE","⚜ GROUP 4 · NORTH CHIHUAHUA")}</span>
+     <h1>{t("Una buena acción","A good deed")}<br/>puede cambiar <em>{t("vidas.","lives.")}</em></h1>
+     <p>{t("Conoce y apoya las causas de nuestra comunidad scout. Transporte, formación, materiales y aventuras: cada proyecto comienza con una buena acción.","Discover and support our Scout community's causes. Transportation, training, equipment, and adventures: every project starts with a good deed.")}</p>
      <div className="hero-actions"><button className="hero-primary" onClick={explore}><Heart size={18}/> Ver causas</button>
       <button className="hero-secondary" onClick={()=>access?show('activity'):openApplication()}>Mi comunidad <ArrowRight size={18}/></button></div>
-    </div><div className="hero-stamp"><Fleur size={27}/><span>SIEMPRE<br/>LISTOS</span></div>
+    </div><div className="hero-stamp"><Fleur size={27}/><span>{t("SIEMPRE","BE")}<br/>{t("LISTOS","PREPARED")}</span></div>
    </section></div>
    <section className="intro-strip">
-    <div><div className="strip-icon"><Heart size={24}/></div><div><b>Apoyo comunitario</b><span>Proyectos para Grupo 4</span></div></div>
-    <div><div className="strip-icon"><ShieldCheck size={24}/></div><div><b>Acceso aprobado</b><span>Comunidad por invitación</span></div></div>
-    <div><div className="strip-icon"><Compass size={24}/></div><div><b>Folios individuales</b><span>Constancia de cada intención</span></div></div>
+    <div><div className="strip-icon"><Heart size={24}/></div><div><b>{t("Apoyo comunitario","Community support")}</b><span>{t("Proyectos para Grupo 4","Projects for Group 4")}</span></div></div>
+    <div><div className="strip-icon"><ShieldCheck size={24}/></div><div><b>{t("Acceso aprobado","Approved access")}</b><span>{t("Comunidad por invitación","Invitation-only community")}</span></div></div>
+    <div><div className="strip-icon"><Compass size={24}/></div><div><b>{t("Folios individuales","Unique reference numbers")}</b><span>{t("Constancia de cada intención","Acknowledgment for every intention")}</span></div></div>
    </section>
    <section className="chn-support-section"><div className="chn-support-deco"><Heart size={48}/></div>
-    <div><span className="kicker">TU APOYO DEJA HUELLA</span><h2>Impulsa causas del Grupo 4</h2>
-     <p>Explora iniciativas con metas concretas, imágenes y un monto de referencia establecido por su organizador.</p>
-     <p className="chn-independence">Esta plataforma registra intenciones de apoyo. No cobra dinero ni emite comprobantes fiscales.</p>
+    <div><span className="kicker">{t("TU APOYO DEJA HUELLA","YOUR SUPPORT MAKES AN IMPACT")}</span><h2>{t("Impulsa causas del Grupo 4","Support Group 4 causes")}</h2>
+     <p>{t("Explora iniciativas con metas concretas, imágenes y un monto de referencia establecido por su organizador.","Explore initiatives with defined goals, photos, and contribution amounts chosen by their organizer.")}</p>
+     <p className="chn-independence">{t("Esta plataforma registra intenciones de apoyo. No cobra dinero ni emite comprobantes fiscales.","This platform records support intentions. It does not collect money or issue tax receipts.")}</p>
     </div><button className="primary" onClick={explore}>Explorar causas <Heart size={18}/></button>
    </section>
    {access?<section className="explore-section" id="causas">
-    <div className="section-title"><div><span className="kicker">APOYA AL GRUPO 4 DE CHIHUAHUA NORTE</span><h2>Causas de la comunidad <span>♥</span></h2>
-     <p>Elige una causa y solicita una intención de apoyo. Cada una tiene un folio único, cupo limitado y aprobación administrativa.</p></div>
-     <div className="headline-stat"><b>{results.length}</b><span>causas visibles</span></div></div>
-    <div className="filter-wrap"><div className="filter-controls"><label className="search-field"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar causas" aria-label="Buscar causas"/></label></div></div>
+    <div className="section-title"><div><span className="kicker">{t("APOYA AL GRUPO 4 DE CHIHUAHUA NORTE","SUPPORT GROUP 4 · NORTH CHIHUAHUA")}</span><h2>Causas de la comunidad <span>♥</span></h2>
+     <p>{t("Elige una causa y solicita una intención de apoyo. Cada una tiene un folio único, cupo limitado y aprobación administrativa.","Choose a cause and submit a support intention. Each has a unique reference, limited capacity, and administrator approval.")}</p></div>
+     <div className="headline-stat"><b>{results.length}</b><span>{t("causas visibles","visible causes")}</span></div></div>
+    <div className="filter-wrap"><div className="filter-controls"><label className="search-field"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder={t('Buscar causas','Search causes')} aria-label={t('Buscar causas','Search causes')}/></label></div></div>
     {loading?<div className="empty"><Compass size={40}/> Cargando…</div>:<CauseGallery causes={results} onOpen={setSelectedCause}/>}
     {canPublish(viewer)&&<div className="chn-create-bottom"><button className="primary" onClick={create}><Plus size={18}/> Crear nueva causa</button></div>}
    </section>:<section className="explore-section private-welcome"><div className="private-welcome-inner"><Compass size={35}/>
-     <h2>Comunidad privada del Grupo 4</h2><p>{needsEnrollment?'Tu cuenta necesita activar el acceso aprobado.':viewer?'Tu solicitud está en revisión.':'Solicita acceso para conocer nuestros proyectos y causas.'}</p>
-     <button className="primary" onClick={()=>needsEnrollment?show('setup'):viewer?setAuth('login'):openApplication()}>{needsEnrollment?'Activar acceso':'Solicitar acceso'} <ArrowRight size={17}/></button>
+     <h2>{t("Comunidad privada del Grupo 4","Private Group 4 community")}</h2><p>{needsEnrollment?'Tu cuenta necesita activar el acceso aprobado.':viewer?'Tu solicitud está en revisión.':'Solicita acceso para conocer nuestros proyectos y causas.'}</p>
+     <button className="primary" onClick={()=>needsEnrollment?show('setup'):viewer?setAuth('login'):openApplication()}>{needsEnrollment?t('Activar acceso','Activate access'):t('Solicitar acceso','Request access')} <ArrowRight size={17}/></button>
     </div></section>}
    {access&&canPublish(viewer)&&<section className="cta-panel"><div className="cta-ornament"><Fleur size={85}/></div>
-    <div><span className="kicker light">UNA BUENA ACCIÓN</span><h2>¿Tu grupo tiene un proyecto que impulsar?</h2>
-     <p>Define la causa, agrega hasta diez fotografías y envíala para aprobación administrativa.</p></div>
+    <div><span className="kicker light">{t("UNA BUENA ACCIÓN","A GOOD DEED")}</span><h2>{t("¿Tu grupo tiene un proyecto que impulsar?","Does your group have a project to support?")}</h2>
+     <p>{t("Define la causa, agrega hasta diez fotografías y envíala para aprobación administrativa.","Describe your cause, add up to ten photos, and submit it for administrator approval.")}</p></div>
     <button onClick={create} className="cta-button">Proponer causa <ArrowRight size={18}/></button></section>}
   </>:screen==='setup'?<section className="inner-page chn-setup-page"><div className="chn-setup-card"><div className="chn-setup-badge"><Fleur size={27}/></div>
    <ExistingMemberJoin done={refreshUser} cancel={logout} onSkip={()=>{setupDismissed.current=true;setScreen('explore')}} onApply={openApplication} notify={notify}/></div></section>:
-  screen==='mine'?<section className="inner-page"><div className="section-title"><div><span className="kicker">MIS PROYECTOS</span><h2>Mis causas</h2><p>Consulta tus causas, incluidas las que están pendientes de aprobación.</p></div>
+  screen==='mine'?<section className="inner-page"><div className="section-title"><div><span className="kicker">{t("MIS PROYECTOS","MY PROJECTS")}</span><h2>{t("Mis causas","My causes")}</h2><p>{t("Consulta tus causas, incluidas las que están pendientes de aprobación.","View your causes, including those awaiting approval.")}</p></div>
     <button className="primary" onClick={create}><Plus size={17}/> Nueva causa</button></div><CauseGallery causes={mine} includeDrafts onOpen={setSelectedCause}/></section>:
-  screen==='activity'?<section className="inner-page"><div className="section-title"><div><span className="kicker">TU COMUNIDAD</span><h2>Historial de apoyos</h2><p>Consulta los folios únicos y su estado de aprobación. Ninguno acredita pagos.</p></div><Heart size={40} className="page-icon"/></div>
+  screen==='activity'?<section className="inner-page"><div className="section-title"><div><span className="kicker">{t("TU COMUNIDAD","YOUR COMMUNITY")}</span><h2>{t("Historial de apoyos","Support history")}</h2><p>{t("Consulta los folios únicos y su estado de aprobación. Ninguno acredita pagos.","View your unique reference numbers and approval statuses. None is proof of payment.")}</p></div><Heart size={40} className="page-icon"/></div>
    <div className="activity-block"><h3><Heart size={20}/> Mis intenciones <span>{mySupport.length}</span></h3>
     {mySupport.length?mySupport.map(p=><div className="activity-row" key={p.id}>
-     <b>{causes.find(c=>c.id===p.cause_id)?.title||'Apoyo al Grupo 4'} · {money(p.amount)}</b>
-     <small>Folio {ackLabel(p.acknowledgment_no)} · {p.status==='approved'?'Aprobada':p.status==='rejected'?'Rechazada':p.status==='pending'?'Pendiente de aprobación':'Registro anterior'} · Sin pago</small>
-     <small>Destinatario: {p.recipient_name||'No especificado'} · {new Date(p.created_at).toLocaleDateString('es-MX')}</small>
-     <button className="chn-cause-history-action" onClick={()=>setAck({intent_id:p.id,ack_no:p.acknowledgment_no,amount_mxn:p.amount,cause_title:causes.find(c=>c.id===p.cause_id)?.title||'Apoyo al Grupo 4',issued_at:p.created_at,intent_status:p.status,recipient_name:p.recipient_name})}>Ver acuse numerado</button>
-    </div>):<p className="empty-small">No has registrado ninguna intención de apoyo.</p>}
-    <button className="secondary" onClick={explore}>Explorar causas</button>
+     <b>{causes.find(c=>c.id===p.cause_id)?.title||'Apoyo al Grupo 4'} · {format(p.amount,p.currency_code||'MXN')}</b>
+     <small>Folio {ackLabel(p.acknowledgment_no)} · {p.status==='approved'?t('Aprobada','Approved'):p.status==='rejected'?t('Rechazada','Rejected'):p.status==='pending'?'Pendiente de aprobación':'Registro anterior'} · Sin pago</small>
+     <small>Destinatario: {p.recipient_name||t('No especificado','Not specified')} · {new Date(p.created_at).toLocaleDateString('es-MX')}</small>
+     <button className="chn-cause-history-action" onClick={()=>setAck({intent_id:p.id,ack_no:p.acknowledgment_no,cause_title:causes.find(c=>c.id===p.cause_id)?.title||'Apoyo al Grupo 4',issued_at:p.created_at,intent_status:p.status,recipient_name:p.recipient_name,amount_value:p.amount,currency_code:p.currency_code||'MXN'})}>{t("Ver acuse numerado","View numbered acknowledgment")}</button>
+    </div>):<p className="empty-small">{t("No has registrado ninguna intención de apoyo.","You haven't registered any support intentions.")}</p>}
+    <button className="secondary" onClick={explore}>{t("Explorar causas","Explore causes")}</button>
    </div></section>:
   screen==='profile'&&(profileTarget||viewer)?<div className="inner-page profile-container"><button className="back-link" onClick={()=>show('explore')}><ArrowLeft size={17}/> Volver</button>
    <ProfilePage person={(profileTarget||viewer)!} current={viewer?.id===(profileTarget||viewer)?.id} onSave={refreshUser} notify={notify}
@@ -363,11 +373,11 @@ export default function App(){
    {viewer?.id===(profileTarget||viewer)?.id&&<button className="text-logout" onClick={()=>{void logout()}}><LogOut size={16}/> Cerrar sesión</button>}</div>:
   screen==='admin'&&viewer?.role==='admin'?<div className="inner-page"><Admin causes={causes} refresh={refresh} notify={notify}/></div>:null
   }</main>
-  <footer className="footer"><div className="footer-top"><div className="footer-brand"><div className="logo-mark"><Fleur size={27}/></div><div><b>SCOUTAPOYA <span>CHN</span></b><p>Causas comunitarias del Grupo 4 de Chihuahua Norte.</p></div></div>
-   <div className="footer-links"><button onClick={()=>show('explore')}>Inicio</button><button onClick={explore}>Causas</button>{access&&<button onClick={()=>show('activity')}>Mis apoyos</button>}</div></div>
-   <div className="footer-bottom"><span>© {new Date().getFullYear()} ScoutApoya · Grupo 4 CHN</span><span>Sin pagos integrados · Acuses de intención · Comunidad privada</span></div>
+  <footer className="footer"><div className="footer-top"><div className="footer-brand"><div className="logo-mark"><Fleur size={27}/></div><div><b>SCOUTAPOYA <span>CHN</span></b><p>{t("Causas comunitarias del Grupo 4 de Chihuahua Norte.","Community causes for Group 4, North Chihuahua.")}</p></div></div>
+   <div className="footer-links"><button onClick={()=>show('explore')}>{t("Inicio","Home")}</button><button onClick={explore}>{t("Causas","Causes")}</button>{access&&<button onClick={()=>show('activity')}>{t("Mis apoyos","My support")}</button>}</div></div>
+   <div className="footer-bottom"><span>© {new Date().getFullYear()} ScoutApoya · Grupo 4 CHN</span><span>{t("Sin pagos integrados · Acuses de intención · Comunidad privada","No integrated payments · Intention acknowledgments · Private community")}</span></div>
   </footer>
-  {toast&&<div className={'toast'+(toast.error?' error':'')} role="status">{toast.error?<Flag size={18}/>:<CheckCircle2 size={18}/>} {toast.text}<button onClick={()=>setToast(null)} aria-label="Cerrar"><X size={16}/></button></div>}
+  {toast&&<div className={'toast'+(toast.error?' error':'')} role="status">{toast.error?<Flag size={18}/>:<CheckCircle2 size={18}/>} {toast.text}<button onClick={()=>setToast(null)} aria-label={t('Cerrar','Close')}><X size={16}/></button></div>}
   {application&&<Modal onClose={()=>setApplication(false)}><AccessApplication onClose={()=>setApplication(false)} notify={notify} onRegister={openApprovedRegistration}/></Modal>}
   {passwordRecovery&&<Modal onClose={()=>setPasswordRecovery(false)}><PasswordRecovery onClose={()=>setPasswordRecovery(false)} notify={notify}/></Modal>}
   {auth&&<Modal onClose={()=>setAuth(null)}><Authentication mode={auth} setMode={setAuth} onClose={()=>setAuth(null)} onSuccess={async()=>{setupDismissed.current=false;await refreshUser()}} notify={notify} onApply={openApplication}/></Modal>}
