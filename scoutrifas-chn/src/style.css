@@ -182,3 +182,41 @@ main{min-height:65vh}.hero-shell{max-width:1230px;padding:0 20px;margin:22px aut
 @media(max-width:580px){.chn-support-section{margin:20px 12px;gap:15px;padding:22px 17px}.chn-support-deco{width:56px;height:56px;border-radius:16px}.chn-support-deco svg{height:30px;width:30px}.chn-support-section>div:nth-child(2){flex-basis:calc(100% - 73px)}.chn-support-section .primary{width:100%}.chn-donation-amounts{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 .chn-beneficiary-note{margin:0;padding:11px 14px;background:#f6f0fa;color:#634a76;border-radius:11px;font-size:.9rem;line-height:1.5}
+
+
+/* ES/EN language and light/dark preference toggles, persisted locally */
+.chn-pref-switches{display:flex;align-items:center;gap:7px;flex-shrink:0}
+.chn-pref-group{display:flex;align-items:center;gap:2px;padding:3px;border:1px solid var(--border);border-radius:11px;background:#f5f0f7;color:#6d5185}
+.chn-pref-group>svg{margin:0 4px}
+.chn-pref-group button{font-size:11px;display:inline-flex;align-items:center;justify-content:center;min-height:30px;min-width:30px;border:0;border-radius:8px;background:transparent;color:inherit;font-weight:800;cursor:pointer}
+.chn-pref-group button.active{background:#fff;color:#45235d;box-shadow:0 1px 5px #31204326}
+.chn-pref-group button:focus-visible{outline:2px solid #be83e9}
+@media(max-width:1150px){.nav-container{gap:9px}.nav-links{gap:10px}.nav-right{gap:7px}.create-nav{padding:10px}}
+@media(max-width:720px){.chn-pref-switches{gap:4px}.chn-pref-group{padding:2px;gap:0}.chn-pref-group button{min-height:29px;min-width:28px}.chn-pref-group>svg{display:none}.nav-container{padding:0 10px}.logo-name{font-size:16px}.logo-mark{width:37px;height:37px}}
+@media(max-width:390px){.chn-pref-group button{min-width:25px}.logo-name small{font-size:7px}.nav-right{gap:3px}}
+
+html[data-theme="dark"]{--purple:#b992e5;--purple-dark:#caaaf1;--purple-light:#302642;--ink:#f2eafa;--gray:#c9bbce;--border:#55455e;background:#17111e;color:#f2eafa}
+html[data-theme="dark"] body{background:#17111e;color:#f2eafa}
+html[data-theme="dark"] :is(.site-header,.modal,.filter-wrap,.chn-cause-card,.chn-ack-print,.chn-cause-empty,.profile-view,.activity-block,.activity-row,.admin-list,.admin-tabs,.stat,.chn-setup-card,.private-welcome-inner,.empty,.account){background:#241b2e;color:#f3e9f9;border-color:#51415d}
+html[data-theme="dark"] :is(.chn-support-section,.chn-cause-amount,.chn-cause-amount-box,.chn-cause-projector,.notice,.chn-ack-no,.chn-ack-notice,.search-field,.switcher,.chn-pref-group,.chn-cause-amount-box,.chn-cause-empty,.chn-setup-badge){background:#30243d;color:#e3d3eb;border-color:#574367}
+html[data-theme="dark"] :is(.form-col input,.form-col textarea,.form-col select,.search-field input,.filter-controls select,.chn-donation-amounts button){background:#30243d;color:#f2eaf7;border-color:#61516d}
+html[data-theme="dark"] :is(.chn-pref-group button.active,.switcher button.selected){background:#503b64;color:#fff}
+html[data-theme="dark"] :is(.chn-support-section h2,.chn-cause-copy h3,.chn-cause-detail-info h2,.chn-cause-empty h3,.stat b,.filter-wrap h3,.chn-ack-details strong,.profile-view h2,.section-title h2,.chn-cause-projector strong,.chn-cause-amount strong,.chn-cause-amount-box strong,.headline-stat b,.auth-content h2,.chn-ack-no){color:#f2dfff}
+html[data-theme="dark"] :is(.chn-support-section p,.chn-support-section .chn-independence,.chn-cause-copy>p,.chn-cause-description,.chn-cause-category,.chn-cause-meta,.chn-intentions-caption,.chn-cause-amount>span,.chn-cause-amount-box>span,.chn-cause-amount-box small,.chn-cause-detail-info .chn-cause-disclaimer,.section-title p,.subtle,.auth-foot,.admin-line p,.stat span,.activity-row small,.chn-ack-details span,.chn-ack-footer){color:#ccbad6}
+html[data-theme="dark"] .nav-links button{color:#d2c2dc}
+html[data-theme="dark"] .nav-links button:hover,html[data-theme="dark"] .nav-links button.nav-active{color:#e5cafc}
+html[data-theme="dark"] .logo{color:#e5cafc}
+html[data-theme="dark"] .sign-in,html[data-theme="dark"] .secondary{background:#403052;color:#e4d0f4;border-color:#69527f}
+html[data-theme="dark"] .create-nav,html[data-theme="dark"] .primary{background:#7b54a7;color:white}
+html[data-theme="dark"] .create-nav:hover,html[data-theme="dark"] .primary:hover{background:#8e69b8}
+html[data-theme="dark"] .modal-close,html[data-theme="dark"] .icon-button{background:#493658;color:#f7eafc}
+html[data-theme="dark"] .chn-cause-amount,html[data-theme="dark"] .chn-cause-amount-box{background:#39294a}
+html[data-theme="dark"] .chn-cause-tag{background:#372949;color:#f2dcfa}
+html[data-theme="dark"] .chn-cause-cover{background:#41304f}
+html[data-theme="dark"] .activity-row:hover{background:#30223e}
+html[data-theme="dark"] .chn-pref-switches .chn-pref-group{background:#30243c}
+html[data-theme="dark"] .chn-ack-notice{border-left-color:#cda66b}
+html[data-theme="dark"] .file-button,html[data-theme="dark"] .upload-zone{background:#30233b;color:#e0cdea;border-color:#6a547a}
+html[data-theme="dark"] .toast{background:#392a48;color:#f7e5fe}
+html[data-theme="dark"] .chn-form-error{background:#522c3a;color:#ffe2e6}
+@media(prefers-reduced-motion:reduce){.chn-intentions-progress>span{transition:none}}
